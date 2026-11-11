@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Sliders, Store, Building2, Users, Plus, UserPlus, Pencil, Trash2, Search, X, AlertTriangle,
+  ArrowLeft, Sliders, Store, Building2, Users, Plus, UserPlus, Pencil, Trash2, Search, X, AlertTriangle,
 } from 'lucide-react';
 import { api, formatInr } from '../api/client';
 import DepartmentModal from '../components/DepartmentModal';
@@ -17,7 +17,7 @@ function getNextEmpCode(employees) {
   return `KVR-${String(maxNum + 1).padStart(3, '0')}`;
 }
 
-export default function SettingsPage({ onSettingsSaved, showToast }) {
+export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
   const [loading, setLoading] = useState(true);
   const [shop, setShop] = useState(null);
   const [settings, setSettings] = useState(null);
@@ -85,8 +85,15 @@ export default function SettingsPage({ onSettingsSaved, showToast }) {
 
   if (loading || !settings || !shop) {
     return (
-      <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-        Loading Rewardly settings...
+      <div>
+        <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center' }}>
+          <button type="button" className="btn btn-soft btn-sm" onClick={onBack}>
+            <ArrowLeft size={15} /> Back to Dashboard
+          </button>
+        </div>
+        <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+          Loading Rewardly settings...
+        </div>
       </div>
     );
   }
@@ -163,6 +170,12 @@ export default function SettingsPage({ onSettingsSaved, showToast }) {
 
   return (
     <div className="settings-grid">
+      <div className="col-12" style={{ display: 'flex', alignItems: 'center' }}>
+        <button type="button" className="btn btn-soft btn-sm" onClick={onBack}>
+          <ArrowLeft size={15} /> Back to Dashboard
+        </button>
+      </div>
+
       {/* 1. CONFIGURABLE PERFORMANCE SCORE WEIGHTS */}
       <form className="card col-6" onSubmit={handleSaveSettings}>
         <div className="card-header">

@@ -105,16 +105,22 @@ export default function AiAssistantPanel({
         type="button"
         className="ai-floating-launcher"
         onClick={onToggleOpen}
-        aria-label="Expand AI Assistant"
+        aria-label="Rewardly AI Assistant"
+        title="Rewardly AI Assistant"
       >
         <span className="ai-launcher-icon">
-          <Bot size={18} />
+          <Bot size={20} />
         </span>
-        <span className="ai-launcher-label">Rewardly AI Assistant</span>
+        <span className="ai-launcher-expand">
+          <span className="ai-launcher-label">Rewardly AI Assistant</span>
+          {pendingRewards.length > 0 && (
+            <span className="ai-tab-badge">{pendingRewards.length}</span>
+          )}
+          <ChevronUp size={15} />
+        </span>
         {pendingRewards.length > 0 && (
-          <span className="ai-tab-badge">{pendingRewards.length}</span>
+          <span className="ai-launcher-badge-dot">{pendingRewards.length}</span>
         )}
-        <ChevronUp size={16} />
       </button>
     );
   }

@@ -193,7 +193,7 @@ export default function App() {
             />
           ) : (
             <SettingsPage
-              departments={meta?.departments || []}
+              onBack={() => handleNavigate('dashboard')}
               onSettingsSaved={() => loadMetaAndDash(startDate, endDate, department)}
               showToast={showToast}
             />

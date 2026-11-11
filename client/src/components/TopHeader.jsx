@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Award, Bell, ChevronDown, LayoutDashboard, Settings, Sparkles, Store,
+  Award, Bell, ChevronDown, Settings, Sparkles, Store,
 } from 'lucide-react';
 
 function getOwnerInitials(name) {
@@ -201,19 +201,6 @@ export default function TopHeader({
               </div>
 
               <div className="profile-dropdown-items">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`profile-menu-item ${activePage === 'dashboard' ? 'active' : ''}`}
-                  onClick={() => goToPage('dashboard')}
-                >
-                  <LayoutDashboard size={16} />
-                  <div>
-                    <div className="profile-item-title">Dashboard</div>
-                    <div className="profile-item-sub">Static &amp; Custom AI Views</div>
-                  </div>
-                </button>
-
                 <button
                   type="button"
                   role="menuitem"
