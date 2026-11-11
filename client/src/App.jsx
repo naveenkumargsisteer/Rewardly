@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { api } from './api/client';
 import SidebarMenu from './components/SidebarMenu';
 import TopHeader from './components/TopHeader';
@@ -23,6 +23,7 @@ export default function App() {
 
   const [dashboard, setDashboard] = useState(null);
   const [loadingDash, setLoadingDash] = useState(true);
+  const [apiError, setApiError] = useState('');
 
   const [employeesModalOpen, setEmployeesModalOpen] = useState(false);
   const [selectedEmpId, setSelectedEmpId] = useState(null);
@@ -39,6 +40,7 @@ export default function App() {
 
   const loadMetaAndDash = useCallback(async (sDate, eDate, dept) => {
     setLoadingDash(true);
+    setApiError('');
     try {
       const [metaData, dashData] = await Promise.all([
         api.getMeta(),
@@ -47,6 +49,7 @@ export default function App() {
       setMeta(metaData);
       setDashboard(dashData);
     } catch (err) {
+      setApiError(err.message || 'Failed to load data from backend API.');
       showToast(err.message);
     } finally {
       setLoadingDash(false);
@@ -54,6 +57,7 @@ export default function App() {
   }, [showToast]);
 
   useEffect(() => {
+    setApiError('');
     api.getMeta()
       .then((m) => {
         setMeta(m);
@@ -64,7 +68,10 @@ export default function App() {
         return api.getDashboard({ startDate: s, endDate: e, department: 'all' });
       })
       .then((d) => setDashboard(d))
-      .catch((err) => showToast(err.message))
+      .catch((err) => {
+        setApiError(err.message || 'Failed to load data from backend API.');
+        showToast(err.message);
+      })
       .finally(() => setLoadingDash(false));
   }, [showToast]);
 
@@ -133,6 +140,39 @@ export default function App() {
         />
 
         <main className="page-container">
+          {apiError && (
+            <div
+              className="card"
+              role="alert"
+              style={{
+                marginBottom: 14,
+                padding: '12px 16px',
+                borderColor: '#fca5a5',
+                background: '#fef2f2',
+                color: '#991b1b',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+                <AlertTriangle size={18} />
+                <div>
+                  <strong>Data Load Error:</strong> {apiError}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => loadMetaAndDash(startDate, endDate, department)}
+                style={{ padding: '6px 12px', fontSize: 12 }}
+              >
+                <RefreshCw size={13} /> Retry
+              </button>
+            </div>
+          )}
           {activePage === 'dashboard' ? (
             <DashboardPage
               dashboard={dashboard}

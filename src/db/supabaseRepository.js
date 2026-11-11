@@ -28,13 +28,16 @@ class SupabaseRepository {
 
   async ensureSeededIfEmpty() {
     if (this._seedChecked) return;
-    const { count, error } = await this.supabase
-      .from('shops')
-      .select('*', { count: 'exact', head: true });
-    if (error) {
-      throw new Error(`Supabase shops check error (verify schema.sql was executed): ${error.message}`);
+    const [shopsRes, empRes, salesRes] = await Promise.all([
+      this.supabase.from('shops').select('*', { count: 'exact', head: true }),
+      this.supabase.from('employees').select('*', { count: 'exact', head: true }),
+      this.supabase.from('sales_records').select('*', { count: 'exact', head: true }),
+    ]);
+    const firstErr = shopsRes.error || empRes.error || salesRes.error;
+    if (firstErr) {
+      throw new Error(`Supabase schema check error (verify schema.sql was executed): ${firstErr.message}`);
     }
-    if ((count || 0) === 0) {
+    if ((shopsRes.count || 0) === 0 || (empRes.count || 0) === 0 || (salesRes.count || 0) === 0) {
       await this.resetAndReseed();
     }
     this._seedChecked = true;
