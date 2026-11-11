@@ -7,26 +7,49 @@ function isConfiguredSupabaseUrl(url) {
   return Boolean(url && url.startsWith('http') && !url.includes('your-project-ref'));
 }
 
-function getConfig() {
-  const supabaseUrl = (process.env.SUPABASE_URL || '').trim();
-  const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '').trim();
-  const hasSupabase = isConfiguredSupabaseUrl(supabaseUrl) && Boolean(supabaseKey && !supabaseKey.includes('your-supabase'));
+function isPlaceholderKey(key) {
+  return !key || key.includes('your-supabase') || key.includes('your_anon_key');
+}
 
-  const requestedSource = (process.env.DATA_SOURCE || 'auto').toLowerCase();
-  const activeSource = requestedSource === 'sqlite'
+function getConfig() {
+  const supabaseUrl = (
+    process.env.SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.VITE_SUPABASE_URL ||
+    ''
+  ).trim();
+
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const anonKey = (
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    ''
+  ).trim();
+
+  const supabaseKey = !isPlaceholderKey(serviceRoleKey) ? serviceRoleKey : anonKey;
+  const hasSupabase = isConfiguredSupabaseUrl(supabaseUrl) && !isPlaceholderKey(supabaseKey);
+  const isVercel = Boolean(process.env.VERCEL);
+
+  const requestedSource = (process.env.DATA_SOURCE || (isVercel ? 'supabase' : 'auto')).toLowerCase();
+  const activeSource = requestedSource === 'sqlite' && !isVercel
     ? 'sqlite'
-    : requestedSource === 'supabase'
-      ? (hasSupabase ? 'supabase' : 'sqlite')
-      : (hasSupabase ? 'supabase' : 'sqlite');
+    : hasSupabase
+      ? 'supabase'
+      : (isVercel ? 'supabase-unconfigured' : 'sqlite');
 
   return {
     port: Number(process.env.PORT || 3000),
     nodeEnv: process.env.NODE_ENV || 'development',
+    isVercel,
     requestedSource,
     activeSource,
     hasSupabase,
     supabaseUrl,
     supabaseKey,
+    supabaseAnonKey: !isPlaceholderKey(anonKey) ? anonKey : supabaseKey,
+    usingServiceRole: !isPlaceholderKey(serviceRoleKey),
     geminiApiKey: (process.env.GEMINI_API_KEY || '').trim(),
     openaiApiKey: (process.env.OPENAI_API_KEY || '').trim(),
   };
@@ -36,4 +59,3 @@ module.exports = {
   getConfig,
   isConfiguredSupabaseUrl,
 };
-

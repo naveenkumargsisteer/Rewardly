@@ -1,23 +1,33 @@
 const { createClient } = require('@supabase/supabase-js');
 const { getConfig, isConfiguredSupabaseUrl } = require('../config/env');
-const SqliteRepository = require('./sqliteRepository');
 const SupabaseRepository = require('./supabaseRepository');
 
 let cachedRepo = null;
-let cachedSource = null;
+let cachedKey = null;
 
 function getRepository() {
   const cfg = getConfig();
-  if (cachedRepo && cachedSource === cfg.activeSource) {
+  if (cfg.activeSource === 'supabase-unconfigured') {
+    const err = new Error(
+      'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY) in Vercel Environment Variables.'
+    );
+    err.status = 503;
+    throw err;
+  }
+
+  const cacheSignature = `${cfg.activeSource}:${cfg.supabaseUrl}:${cfg.supabaseKey ? 'key' : 'none'}`;
+  if (cachedRepo && cachedKey === cacheSignature) {
     return cachedRepo;
   }
 
   if (cfg.activeSource === 'supabase') {
     cachedRepo = new SupabaseRepository(cfg.supabaseUrl, cfg.supabaseKey);
-    cachedSource = 'supabase';
+    cachedKey = cacheSignature;
   } else {
+    // Lazy-require SQLite only for local zero-config runs (never loaded on Vercel/Supabase)
+    const SqliteRepository = require('./sqliteRepository');
     cachedRepo = new SqliteRepository();
-    cachedSource = 'sqlite';
+    cachedKey = cacheSignature;
   }
 
   return cachedRepo;
@@ -29,7 +39,10 @@ function getBackendStatus() {
     activeSource: cfg.activeSource,
     label: cfg.activeSource === 'supabase'
       ? 'Supabase PostgreSQL Cloud'
-      : 'Local SQLite Mirror (Supabase-Compatible Schema)',
+      : cfg.activeSource === 'supabase-unconfigured'
+        ? 'Supabase Required (Env Vars Missing)'
+        : 'Local SQLite Mirror (Supabase-Compatible Schema)',
+    isVercel: cfg.isVercel,
     supabaseConfigured: cfg.hasSupabase,
     supabaseUrl: cfg.hasSupabase ? cfg.supabaseUrl : null,
     aiKeysConfigured: {
@@ -60,4 +73,3 @@ module.exports = {
   getBackendStatus,
   testSupabaseConnection,
 };
-

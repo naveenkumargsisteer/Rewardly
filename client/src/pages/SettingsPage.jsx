@@ -591,7 +591,10 @@ export default function SettingsPage({ departments, onSettingsSaved, showToast }
           </div>
 
           <form onSubmit={handleTestSupabase} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <strong style={{ fontSize: 13 }}>Test Live Supabase Connection (Optional Cloud Mode)</strong>
+            <strong style={{ fontSize: 13 }}>Vercel + Supabase Cloud Connection</strong>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
+              For Vercel deployment, set <code>SUPABASE_URL</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code> (or <code>SUPABASE_ANON_KEY</code>), and <code>DATA_SOURCE=supabase</code> in Vercel Project Environment Variables.
+            </div>
             <input
               type="url"
               className="input"

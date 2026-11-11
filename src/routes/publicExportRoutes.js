@@ -79,6 +79,8 @@ async function handlePublicExport(req, res, next) {
     });
 
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
     res.setHeader('Cache-Control', 'no-store');
 
     if (String(format).toLowerCase() === 'csv') {

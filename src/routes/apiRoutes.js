@@ -256,7 +256,7 @@ router.post('/settings/reset-seed', async (req, res, next) => {
 
 router.get('/supabase/schema', (req, res, next) => {
   try {
-    const schemaPath = path.resolve(process.cwd(), 'supabase', 'schema.sql');
+    const schemaPath = path.resolve(__dirname, '..', '..', 'supabase', 'schema.sql');
     const sql = fs.readFileSync(schemaPath, 'utf8');
     res.type('text/plain').send(sql);
   } catch (err) {

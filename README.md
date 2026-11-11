@@ -36,6 +36,15 @@ Open `http://localhost:3000`.
      ```
 3. Start the server (`npm start`). Rewardly automatically detects valid Supabase credentials and routes all API queries to `@supabase/supabase-js`.
 
+## Deploying on Vercel + Supabase
+1. Run [`supabase/schema.sql`](supabase/schema.sql) in your Supabase project's **SQL Editor** (and optionally [`supabase/seed.sql`](supabase/seed.sql); if tables are empty, Rewardly also auto-seeds on first API request).
+2. Import this GitHub repository into **Vercel** (`vercel.json` is pre-configured to build `client/dist` and route `/api/*` through `api/index.js`).
+3. Add the following Environment Variables in **Vercel Project Settings -> Environment Variables**:
+   - `SUPABASE_URL` (or `NEXT_PUBLIC_SUPABASE_URL` via Vercel's Supabase Marketplace integration)
+   - `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_ANON_KEY`)
+   - `DATA_SOURCE=supabase`
+4. Deploy! All endpoints including `https://<your-vercel-domain>/api/public/export?startDate=2026-07-12&endDate=2026-11-11` read and filter live directly from Supabase PostgreSQL.
+
 ## UI Pages
 1. **Dashboard (`/`)**:
    - Global Date Range & Textile Department filters

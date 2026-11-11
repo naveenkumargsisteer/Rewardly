@@ -1,10 +1,43 @@
 const crypto = require('node:crypto');
-const { createClient } = require('@supabase/supabase-js');
+const { createSupabaseClient } = require('./supabaseClient');
 const { generateSeedDataset } = require('../../scripts/seed-data-generator');
 
+const DEFAULT_SETTINGS = {
+  sales_weight: 40,
+  attendance_weight: 25,
+  feedback_weight: 20,
+  recognition_weight: 15,
+  gold_threshold: 85,
+  silver_threshold: 72,
+  public_export_token: 'rw_live_kaveri_2026',
+  require_export_token: false,
+  ai_provider: 'builtin',
+};
+
 class SupabaseRepository {
-  constructor(url, key) {
-    this.supabase = createClient(url, key, { auth: { persistSession: false } });
+  constructor(url, key, ssrContext = null) {
+    this.supabase = createSupabaseClient({
+      url,
+      key,
+      req: ssrContext?.req || null,
+      res: ssrContext?.res || null,
+      useSsr: Boolean(ssrContext?.useSsr),
+    });
+    this._seedChecked = false;
+  }
+
+  async ensureSeededIfEmpty() {
+    if (this._seedChecked) return;
+    const { count, error } = await this.supabase
+      .from('shops')
+      .select('*', { count: 'exact', head: true });
+    if (error) {
+      throw new Error(`Supabase shops check error (verify schema.sql was executed): ${error.message}`);
+    }
+    if ((count || 0) === 0) {
+      await this.resetAndReseed();
+    }
+    this._seedChecked = true;
   }
 
   async fetchAllPaginated(table, buildQuery) {
@@ -17,6 +50,8 @@ class SupabaseRepository {
       if (buildQuery) {
         query = buildQuery(query);
       }
+      // Always apply deterministic tie-breaker sort for stable range pagination
+      query = query.order('id', { ascending: true });
       const { data, error } = await query.range(from, from + pageSize - 1);
       if (error) throw new Error(`Supabase query error (${table}): ${error.message}`);
       if (!data || data.length === 0) break;
@@ -37,6 +72,7 @@ class SupabaseRepository {
   }
 
   async getShopAndMeta() {
+    await this.ensureSeededIfEmpty();
     const { data: shops, error: shopErr } = await this.supabase.from('shops').select('*').limit(1);
     if (shopErr) throw new Error(`Supabase shops error: ${shopErr.message}`);
     const shop = shops?.[0] || null;
@@ -76,6 +112,7 @@ class SupabaseRepository {
   }
 
   async getDepartments() {
+    await this.ensureSeededIfEmpty();
     const { data, error } = await this.supabase
       .from('departments')
       .select('*')
@@ -85,6 +122,7 @@ class SupabaseRepository {
   }
 
   async getEmployees() {
+    await this.ensureSeededIfEmpty();
     const { data, error } = await this.supabase
       .from('employees')
       .select('*, departments(code, name, color_hex, target_monthly_sales)')
@@ -104,12 +142,14 @@ class SupabaseRepository {
   }
 
   async getSettings() {
+    await this.ensureSeededIfEmpty();
     const { data, error } = await this.supabase.from('scoring_settings').select('*').limit(1);
     if (error) throw new Error(`Supabase settings error: ${error.message}`);
     const row = data?.[0];
+    if (!row) return { ...DEFAULT_SETTINGS };
     return {
       ...row,
-      require_export_token: Boolean(row?.require_export_token),
+      require_export_token: Boolean(row.require_export_token),
     };
   }
 
@@ -162,10 +202,12 @@ class SupabaseRepository {
   }
 
   async getPeriodData({ startDate, endDate, departmentCode }) {
+    await this.ensureSeededIfEmpty();
     let employeeIds = null;
+    const employees = await this.getEmployees();
+
     if (departmentCode && departmentCode !== 'all') {
-      const emps = await this.getEmployees();
-      employeeIds = emps
+      employeeIds = employees
         .filter((e) => e.department_code === departmentCode || e.department_id === departmentCode)
         .map((e) => e.id);
       if (employeeIds.length === 0) {
@@ -175,7 +217,7 @@ class SupabaseRepository {
 
     const applyEmpFilter = (q) => (employeeIds ? q.in('employee_id', employeeIds) : q);
 
-    const [sales, attendance, feedback, recognitions, rewardsRaw, employees] = await Promise.all([
+    const [sales, attendance, feedback, recognitions, rewardsRaw] = await Promise.all([
       this.fetchAllPaginated('sales_records', (q) =>
         applyEmpFilter(q.gte('sale_date', startDate).lte('sale_date', endDate)).order('sale_date', { ascending: true })
       ),
@@ -191,7 +233,6 @@ class SupabaseRepository {
       this.fetchAllPaginated('reward_recommendations', (q) =>
         applyEmpFilter(q.gte('period_end', startDate).lte('period_start', endDate)).order('composite_score', { ascending: false })
       ),
-      this.getEmployees(),
     ]);
 
     const empMap = Object.fromEntries(employees.map((e) => [e.id, e]));
@@ -241,10 +282,19 @@ class SupabaseRepository {
         reviewed_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .select()
+      .select('*, employees(full_name, emp_code, role, avatar_initials, avatar_color, departments(name))')
       .single();
     if (error) throw new Error(`Supabase reward update error: ${error.message}`);
-    return data;
+    const { employees, ...reward } = data;
+    return {
+      ...reward,
+      employee_name: employees?.full_name || '',
+      emp_code: employees?.emp_code || '',
+      role: employees?.role || '',
+      avatar_initials: employees?.avatar_initials || '',
+      avatar_color: employees?.avatar_color || '#7C3AED',
+      department_name: employees?.departments?.name || '',
+    };
   }
 
   async insertSalesRows(rows) {
@@ -304,6 +354,7 @@ class SupabaseRepository {
     await batchUpsert('recognitions', dataset.recognitions);
     await batchUpsert('reward_recommendations', dataset.reward_recommendations);
     await batchUpsert('scoring_settings', [dataset.scoring_settings]);
+    this._seedChecked = true;
     return {
       reset: true,
       employees: dataset.employees.length,
@@ -314,4 +365,3 @@ class SupabaseRepository {
 }
 
 module.exports = SupabaseRepository;
-

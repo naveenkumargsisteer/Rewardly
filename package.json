@@ -9,11 +9,13 @@
     "seed": "node scripts/init-local-db.js",
     "seed:supabase": "node scripts/seed-supabase.js",
     "build": "npm --prefix client run build",
+    "vercel-build": "npm --prefix client run build",
     "dev:client": "npm --prefix client run dev",
     "setup": "npm install && npm --prefix client install && npm run seed && npm run build"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.1",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2"
@@ -22,4 +24,3 @@
     "node": ">=22.0.0"
   }
 }
-
