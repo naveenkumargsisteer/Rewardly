@@ -33,3 +33,4 @@ function createSupabaseClient({ url, key, req = null, res = null, useSsr = false
 module.exports = {
   createSupabaseClient,
 };
+
