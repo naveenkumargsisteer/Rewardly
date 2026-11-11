@@ -4,10 +4,17 @@ import { api } from './api/client';
 import TopHeader from './components/TopHeader';
 import DashboardPage from './pages/DashboardPage';
 import SettingsPage from './pages/SettingsPage';
+import MobileFeedbackPage from './pages/MobileFeedbackPage';
 import EmployeesModal from './components/EmployeesModal';
 import GiveRecognitionModal from './components/GiveRecognitionModal';
 
 export default function App() {
+  const feedbackMatch = window.location.pathname.match(/^\/feedback\/([^/]+)/i);
+  const feedbackEmpRef = feedbackMatch ? decodeURIComponent(feedbackMatch[1]) : null;
+  if (feedbackEmpRef) {
+    return <MobileFeedbackPage empRef={feedbackEmpRef} />;
+  }
+
   const initialPage = window.location.pathname.includes('settings') ? 'settings' : 'dashboard';
   const [activePage, setActivePage] = useState(initialPage);
   const [aiOpen, setAiOpen] = useState(false);

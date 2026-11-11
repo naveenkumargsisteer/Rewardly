@@ -1,5 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { X, UserPlus, UserCheck } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Check,
+  Copy,
+  Download,
+  ExternalLink,
+  QrCode,
+  UserCheck,
+  UserPlus,
+  X,
+} from 'lucide-react';
+import QRCode from 'qrcode';
 import { api } from '../api/client';
 
 const SHIFT_PRESETS = [
@@ -36,10 +46,23 @@ export default function EmployeeFormModal({
   const [form, setForm] = useState(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [copiedQrLink, setCopiedQrLink] = useState(false);
+  const qrCanvasRef = useRef(null);
+
+  const activeQrCode = (form.emp_code || initialEmployee?.emp_code || '').trim().toUpperCase();
+  const feedbackUrl =
+    isEdit && activeQrCode && typeof window !== 'undefined'
+      ? `${window.location.origin}/feedback/${encodeURIComponent(activeQrCode)}`
+      : '';
+  const codeModified =
+    isEdit &&
+    Boolean(initialEmployee?.emp_code) &&
+    activeQrCode !== String(initialEmployee.emp_code).toUpperCase();
 
   useEffect(() => {
     if (!isOpen) return;
     setErrorMsg('');
+    setCopiedQrLink(false);
     if (initialEmployee) {
       setForm({
         emp_code: initialEmployee.emp_code || '',
@@ -67,6 +90,21 @@ export default function EmployeeFormModal({
     }
   }, [isOpen, initialEmployee, departments, suggestedCode]);
 
+  useEffect(() => {
+    if (!isOpen || !isEdit || !feedbackUrl || !qrCanvasRef.current) return;
+    QRCode.toCanvas(
+      qrCanvasRef.current,
+      feedbackUrl,
+      {
+        width: 136,
+        margin: 1,
+        errorCorrectionLevel: 'M',
+        color: { dark: '#1e1b4b', light: '#ffffff' },
+      },
+      () => {}
+    );
+  }, [isOpen, isEdit, feedbackUrl]);
+
   if (!isOpen) return null;
 
   const shiftOptions = form.shift && !SHIFT_PRESETS.includes(form.shift)
@@ -80,6 +118,96 @@ export default function EmployeeFormModal({
       department_id: nextDeptId,
       avatar_color: !isEdit && dept?.color_hex ? dept.color_hex : prev.avatar_color,
     }));
+  }
+
+  async function handleCopyFeedbackLink() {
+    if (!feedbackUrl) return;
+    try {
+      await navigator.clipboard.writeText(feedbackUrl);
+      setCopiedQrLink(true);
+      setTimeout(() => setCopiedQrLink(false), 2000);
+    } catch {
+      // Clipboard API unavailable in restricted contexts
+    }
+  }
+
+  async function handleDownloadQrPng() {
+    if (!feedbackUrl) return;
+    const width = 600;
+    const height = 760;
+    const cardCanvas = document.createElement('canvas');
+    cardCanvas.width = width;
+    cardCanvas.height = height;
+    const ctx = cardCanvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.fillStyle = '#f8f7fc';
+    ctx.fillRect(0, 0, width, height);
+
+    const grad = ctx.createLinearGradient(0, 0, width, 150);
+    grad.addColorStop(0, '#6d28d9');
+    grad.addColorStop(1, '#4f46e5');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, 150);
+
+    try {
+      const logoImg = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = '/rewardly-logo.png';
+      });
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+      ctx.beginPath();
+      ctx.arc(68, 74, 30, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.drawImage(logoImg, 46, 52, 44, 44);
+    } catch {
+      // Proceed even if logo fails to decode
+    }
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 28px Inter, system-ui, sans-serif';
+    ctx.fillText('Rewardly Customer Feedback', 114, 72);
+    ctx.font = '16px Inter, system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+    ctx.fillText('Scan QR to rate your shopping experience', 114, 102);
+
+    const qrCanvas = document.createElement('canvas');
+    await QRCode.toCanvas(qrCanvas, feedbackUrl, {
+      width: 380,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#1e1b4b', light: '#ffffff' },
+    });
+
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#ddd6fe';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(90, 185, 420, 420, 24);
+    ctx.fill();
+    ctx.stroke();
+    ctx.drawImage(qrCanvas, 110, 205, 380, 380);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#1e1b4b';
+    ctx.font = 'bold 26px Inter, system-ui, sans-serif';
+    ctx.fillText(form.full_name || initialEmployee?.full_name || 'Associate', width / 2, 650);
+
+    ctx.fillStyle = '#6d28d9';
+    ctx.font = 'bold 18px Inter, system-ui, sans-serif';
+    const roleLabel = form.role || initialEmployee?.role || 'Sales Associate';
+    ctx.fillText(`${activeQrCode} • ${roleLabel}`, width / 2, 684);
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '14px Inter, system-ui, sans-serif';
+    ctx.fillText('Anonymous QR review • No app or sign-in required', width / 2, 718);
+
+    const link = document.createElement('a');
+    link.href = cardCanvas.toDataURL('image/png');
+    link.download = `rewardly-qr-${activeQrCode.toLowerCase()}.png`;
+    link.click();
   }
 
   async function handleSubmit(e) {
@@ -293,7 +421,50 @@ export default function EmployeeFormModal({
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+          {isEdit && activeQrCode && (
+            <div className="qr-card-box">
+              <div className="qr-canvas-wrap">
+                <canvas ref={qrCanvasRef} aria-label={`QR code for ${activeQrCode}`} />
+              </div>
+              <div className="qr-meta-col">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 13.5, color: '#1e1b4b' }}>
+                  <QrCode size={15} color="#6d28d9" />
+                  Customer Feedback QR Code ({activeQrCode})
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>
+                  Customers can scan this QR from any mobile device to leave an anonymous rating & optional note.
+                </div>
+                {codeModified && (
+                  <div style={{ fontSize: 11.5, color: '#b45309', fontWeight: 600, marginTop: 4 }}>
+                    Save changes to activate updated employee code in QR link.
+                  </div>
+                )}
+                <div className="qr-url-box">{feedbackUrl}</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={handleDownloadQrPng}>
+                    <Download size={13} />
+                    Download QR PNG
+                  </button>
+                  <button type="button" className="btn btn-sm" onClick={handleCopyFeedbackLink}>
+                    {copiedQrLink ? <Check size={13} color="#059669" /> : <Copy size={13} />}
+                    {copiedQrLink ? 'Copied!' : 'Copy Link'}
+                  </button>
+                  <a
+                    href={feedbackUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-sm"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <ExternalLink size={13} />
+                    Preview Mobile Page
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
             <button type="button" className="btn" onClick={onClose} disabled={submitting}>
               Cancel
             </button>

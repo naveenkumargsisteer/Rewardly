@@ -72,6 +72,10 @@ export const api = {
     if (!res.ok) throw new Error('Could not load schema');
     return res.text();
   },
+  getPublicFeedbackTarget: (empRef) =>
+    request(`/api/public/feedback-target/${encodeURIComponent(empRef)}`),
+  submitPublicFeedback: (payload) =>
+    request('/api/public/feedback', { method: 'POST', body: JSON.stringify(payload) }),
 };
 
 export function formatInr(amount) {

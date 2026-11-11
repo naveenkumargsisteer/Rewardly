@@ -341,5 +341,25 @@ router.get('/supabase/schema', (req, res, next) => {
   }
 });
 
+router.get('/public/feedback-target/:empRef', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const target = await repo.getEmployeePublicTarget(req.params.empRef);
+    res.json(target);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/public/feedback', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const created = await repo.createPublicFeedback(req.body || {});
+    res.status(201).json(created);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
 

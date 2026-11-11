@@ -161,10 +161,47 @@ function sanitizeEmployeePayload(body = {}, { isUpdate = false, fallbackColor = 
   return out;
 }
 
+/**
+ * Validate and normalize anonymous QR customer feedback submissions.
+ * @param {object} body
+ * @returns {{ empRef: string, customer_name: string, rating: number, sentiment: string, comment: string, channel: string, feedback_date: string }}
+ */
+function sanitizePublicFeedbackPayload(body = {}) {
+  const empRef = String(body.emp_code || body.employee_id || '').trim();
+  if (!empRef) {
+    throw httpError(400, 'Employee reference is required.');
+  }
+
+  const rawRating = Number(body.rating);
+  if (!Number.isFinite(rawRating) || rawRating < 1 || rawRating > 5) {
+    throw httpError(400, 'Rating must be between 1.0 and 5.0.');
+  }
+  const rating = Math.round(rawRating * 10) / 10;
+
+  const isAnonymous = body.anonymous === true;
+  const rawName = String(body.customer_name || '').trim().slice(0, 80);
+  const customer_name = isAnonymous || !rawName ? 'Anonymous Customer' : rawName;
+
+  const comment = String(body.comment ?? body.note ?? '').trim().slice(0, 500);
+  const sentiment = rating >= 4 ? 'Positive' : rating >= 3 ? 'Neutral' : 'Needs-Attention';
+  const feedback_date = new Date().toISOString().slice(0, 10);
+
+  return {
+    empRef,
+    customer_name,
+    rating,
+    sentiment,
+    comment,
+    channel: 'In-Store QR',
+    feedback_date,
+  };
+}
+
 module.exports = {
   httpError,
   computeInitials,
   sanitizeDepartmentPayload,
   sanitizeEmployeePayload,
+  sanitizePublicFeedbackPayload,
 };
 

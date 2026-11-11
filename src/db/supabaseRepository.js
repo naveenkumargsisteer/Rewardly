@@ -5,6 +5,7 @@ const {
   httpError,
   sanitizeDepartmentPayload,
   sanitizeEmployeePayload,
+  sanitizePublicFeedbackPayload,
 } = require('../utils/crudValidation');
 
 const DEFAULT_SETTINGS = {
@@ -85,10 +86,15 @@ class SupabaseRepository {
     if (shopErr) throw new Error(`Supabase shops error: ${shopErr.message}`);
     const shop = shops?.[0] || null;
 
-    const [{ data: minRow }, { data: maxRow }] = await Promise.all([
+    const [{ data: minRow }, { data: maxRow }, { data: minFbRow }, { data: maxFbRow }] = await Promise.all([
       this.supabase.from('sales_records').select('sale_date').order('sale_date', { ascending: true }).limit(1),
       this.supabase.from('sales_records').select('sale_date').order('sale_date', { ascending: false }).limit(1),
+      this.supabase.from('customer_feedback').select('feedback_date').order('feedback_date', { ascending: true }).limit(1),
+      this.supabase.from('customer_feedback').select('feedback_date').order('feedback_date', { ascending: false }).limit(1),
     ]);
+
+    const minCandidates = [minRow?.[0]?.sale_date, minFbRow?.[0]?.feedback_date].filter(Boolean).sort();
+    const maxCandidates = [maxRow?.[0]?.sale_date, maxFbRow?.[0]?.feedback_date].filter(Boolean).sort();
 
     const [employees, departments, sales_records, attendance_records, customer_feedback, recognitions, reward_recommendations] =
       await Promise.all([
@@ -104,8 +110,8 @@ class SupabaseRepository {
     return {
       shop,
       dateBounds: {
-        minDate: minRow?.[0]?.sale_date || '2026-07-12',
-        maxDate: maxRow?.[0]?.sale_date || '2026-11-11',
+        minDate: minCandidates[0] || '2026-07-12',
+        maxDate: maxCandidates[maxCandidates.length - 1] || '2026-11-11',
       },
       counts: {
         employees,
@@ -494,6 +500,81 @@ class SupabaseRepository {
       avatar_initials: employees?.avatar_initials || '',
       avatar_color: employees?.avatar_color || '#7C3AED',
       department_name: employees?.departments?.name || '',
+    };
+  }
+
+  async getEmployeePublicTarget(empRef) {
+    await this.ensureSeededIfEmpty();
+    const ref = String(empRef || '').trim();
+    if (!ref) {
+      throw httpError(400, 'Employee feedback code is required.');
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ref);
+    const baseQuery = this.supabase
+      .from('employees')
+      .select('id, shop_id, emp_code, full_name, role, avatar_initials, avatar_color, status, departments(name, color_hex)')
+      .limit(1);
+
+    const { data: empRows, error: empErr } = isUuid
+      ? await baseQuery.eq('id', ref)
+      : await baseQuery.ilike('emp_code', ref);
+
+    if (empErr) throw new Error(`Supabase employee lookup error: ${empErr.message}`);
+    const emp = empRows?.[0];
+    if (!emp) {
+      throw httpError(404, 'Employee feedback link not found.');
+    }
+
+    const { data: shopRows, error: shopErr } = await this.supabase
+      .from('shops')
+      .select('id, name, tagline, location, city')
+      .eq('id', emp.shop_id)
+      .limit(1);
+    if (shopErr) throw new Error(`Supabase shop lookup error: ${shopErr.message}`);
+    const shop = shopRows?.[0] || null;
+
+    return {
+      shop,
+      employee: {
+        id: emp.id,
+        emp_code: emp.emp_code,
+        full_name: emp.full_name,
+        role: emp.role,
+        avatar_initials: emp.avatar_initials,
+        avatar_color: emp.avatar_color,
+        status: emp.status,
+        department_name: emp.departments?.name || '',
+        department_color: emp.departments?.color_hex || '#7C3AED',
+      },
+    };
+  }
+
+  async createPublicFeedback(payload) {
+    const clean = sanitizePublicFeedbackPayload(payload);
+    const target = await this.getEmployeePublicTarget(clean.empRef);
+
+    const row = {
+      id: crypto.randomUUID(),
+      shop_id: target.shop.id,
+      employee_id: target.employee.id,
+      feedback_date: clean.feedback_date,
+      rating: clean.rating,
+      sentiment: clean.sentiment,
+      customer_name: clean.customer_name,
+      comment: clean.comment,
+      channel: clean.channel,
+    };
+
+    const { error } = await this.supabase.from('customer_feedback').insert(row);
+    if (error) throw new Error(`Supabase feedback insert error: ${error.message}`);
+
+    return {
+      ...row,
+      employee_name: target.employee.full_name,
+      emp_code: target.employee.emp_code,
+      department_name: target.employee.department_name,
+      shop_name: target.shop.name,
     };
   }
 

@@ -6,6 +6,7 @@ const {
   httpError,
   sanitizeDepartmentPayload,
   sanitizeEmployeePayload,
+  sanitizePublicFeedbackPayload,
 } = require('../utils/crudValidation');
 
 class SqliteRepository {
@@ -25,9 +26,13 @@ class SqliteRepository {
     const shop = this.db.prepare('SELECT * FROM shops LIMIT 1').get();
     const bounds = this.db.prepare(`
       SELECT
-        MIN(sale_date) AS min_date,
-        MAX(sale_date) AS max_date
-      FROM sales_records
+        MIN(d) AS min_date,
+        MAX(d) AS max_date
+      FROM (
+        SELECT sale_date AS d FROM sales_records
+        UNION ALL
+        SELECT feedback_date AS d FROM customer_feedback
+      )
     `).get();
 
     const counts = {
@@ -392,6 +397,88 @@ class SqliteRepository {
       JOIN departments d ON d.id = e.department_id
       WHERE r.id = ?
     `).get(id);
+  }
+
+  async getEmployeePublicTarget(empRef) {
+    const ref = String(empRef || '').trim();
+    if (!ref) {
+      throw httpError(400, 'Employee feedback code is required.');
+    }
+
+    const emp = this.db.prepare(`
+      SELECT e.id, e.shop_id, e.emp_code, e.full_name, e.role, e.avatar_initials, e.avatar_color, e.status,
+             d.name AS department_name, d.color_hex AS department_color
+      FROM employees e
+      LEFT JOIN departments d ON d.id = e.department_id
+      WHERE LOWER(e.emp_code) = LOWER(?) OR e.id = ?
+      LIMIT 1
+    `).get(ref, ref);
+
+    if (!emp) {
+      throw httpError(404, 'Employee feedback link not found.');
+    }
+
+    const shop = this.db.prepare(`
+      SELECT id, name, tagline, location, city
+      FROM shops
+      WHERE id = ?
+      LIMIT 1
+    `).get(emp.shop_id);
+
+    return {
+      shop: shop || null,
+      employee: {
+        id: emp.id,
+        emp_code: emp.emp_code,
+        full_name: emp.full_name,
+        role: emp.role,
+        avatar_initials: emp.avatar_initials,
+        avatar_color: emp.avatar_color,
+        status: emp.status,
+        department_name: emp.department_name || '',
+        department_color: emp.department_color || '#7C3AED',
+      },
+    };
+  }
+
+  async createPublicFeedback(payload) {
+    const clean = sanitizePublicFeedbackPayload(payload);
+    const target = await this.getEmployeePublicTarget(clean.empRef);
+
+    const row = {
+      id: crypto.randomUUID(),
+      shop_id: target.shop.id,
+      employee_id: target.employee.id,
+      feedback_date: clean.feedback_date,
+      rating: clean.rating,
+      sentiment: clean.sentiment,
+      customer_name: clean.customer_name,
+      comment: clean.comment,
+      channel: clean.channel,
+    };
+
+    this.db.prepare(`
+      INSERT INTO customer_feedback (id, shop_id, employee_id, feedback_date, rating, sentiment, customer_name, comment, channel)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      row.id,
+      row.shop_id,
+      row.employee_id,
+      row.feedback_date,
+      row.rating,
+      row.sentiment,
+      row.customer_name,
+      row.comment,
+      row.channel
+    );
+
+    return {
+      ...row,
+      employee_name: target.employee.full_name,
+      emp_code: target.employee.emp_code,
+      department_name: target.employee.department_name,
+      shop_name: target.shop.name,
+    };
   }
 
   async insertSalesRows(rows) {
