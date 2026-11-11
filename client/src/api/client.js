@@ -45,6 +45,25 @@ export const api = {
   getSettings: () => request('/api/settings'),
   updateSettings: (payload) =>
     request('/api/settings', { method: 'PUT', body: JSON.stringify(payload) }),
+  createEmployee: (payload) =>
+    request('/api/employees', { method: 'POST', body: JSON.stringify(payload) }),
+  updateEmployee: (id, payload) =>
+    request(`/api/employees/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  deleteEmployee: (id) =>
+    request(`/api/employees/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  getDepartments: () => request('/api/departments'),
+  createDepartment: (payload) =>
+    request('/api/departments', { method: 'POST', body: JSON.stringify(payload) }),
+  updateDepartment: (id, payload) =>
+    request(`/api/departments/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  deleteDepartment: (id) =>
+    request(`/api/departments/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   testSupabase: (payload) =>
     request('/api/settings/test-supabase', { method: 'POST', body: JSON.stringify(payload) }),
   resetSeed: () => request('/api/settings/reset-seed', { method: 'POST' }),

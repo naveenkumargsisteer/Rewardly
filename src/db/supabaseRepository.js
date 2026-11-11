@@ -1,6 +1,11 @@
 const crypto = require('node:crypto');
 const { createSupabaseClient } = require('./supabaseClient');
 const { generateSeedDataset } = require('../../scripts/seed-data-generator');
+const {
+  httpError,
+  sanitizeDepartmentPayload,
+  sanitizeEmployeePayload,
+} = require('../utils/crudValidation');
 
 const DEFAULT_SETTINGS = {
   sales_weight: 40,
@@ -124,6 +129,17 @@ class SupabaseRepository {
     return data || [];
   }
 
+  _formatEmployeeRow(row) {
+    const { departments, ...emp } = row;
+    return {
+      ...emp,
+      department_code: departments?.code || '',
+      department_name: departments?.name || '',
+      department_color: departments?.color_hex || '#7C3AED',
+      target_monthly_sales: Number(departments?.target_monthly_sales || 1000000),
+    };
+  }
+
   async getEmployees() {
     await this.ensureSeededIfEmpty();
     const { data, error } = await this.supabase
@@ -132,16 +148,197 @@ class SupabaseRepository {
       .order('emp_code', { ascending: true });
     if (error) throw new Error(`Supabase employees error: ${error.message}`);
 
-    return (data || []).map((row) => {
-      const { departments, ...emp } = row;
-      return {
-        ...emp,
-        department_code: departments?.code || '',
-        department_name: departments?.name || '',
-        department_color: departments?.color_hex || '#7C3AED',
-        target_monthly_sales: Number(departments?.target_monthly_sales || 1000000),
-      };
+    return (data || []).map((row) => this._formatEmployeeRow(row));
+  }
+
+  async createDepartment(payload) {
+    const { shop } = await this.getShopAndMeta();
+    const clean = sanitizeDepartmentPayload(payload, { isUpdate: false });
+
+    const { data: existing } = await this.supabase
+      .from('departments')
+      .select('id')
+      .eq('shop_id', shop.id)
+      .eq('code', clean.code)
+      .maybeSingle();
+    if (existing) {
+      throw httpError(409, `Department code "${clean.code}" already exists.`);
+    }
+
+    const row = { id: crypto.randomUUID(), shop_id: shop.id, ...clean };
+    const { data, error } = await this.supabase
+      .from('departments')
+      .insert(row)
+      .select()
+      .single();
+    if (error) throw new Error(`Supabase department create error: ${error.message}`);
+    return data;
+  }
+
+  async updateDepartment(id, payload) {
+    await this.ensureSeededIfEmpty();
+    const { data: current, error: findErr } = await this.supabase
+      .from('departments')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (findErr) throw new Error(`Supabase department lookup error: ${findErr.message}`);
+    if (!current) throw httpError(404, 'Department not found.');
+
+    const clean = sanitizeDepartmentPayload(payload, { isUpdate: true });
+    if (clean.code && clean.code !== current.code) {
+      const { data: dup } = await this.supabase
+        .from('departments')
+        .select('id')
+        .eq('shop_id', current.shop_id)
+        .eq('code', clean.code)
+        .neq('id', id)
+        .maybeSingle();
+      if (dup) {
+        throw httpError(409, `Department code "${clean.code}" already exists.`);
+      }
+    }
+
+    if (Object.keys(clean).length === 0) return current;
+    const { data, error } = await this.supabase
+      .from('departments')
+      .update(clean)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error(`Supabase department update error: ${error.message}`);
+    return data;
+  }
+
+  async deleteDepartment(id) {
+    await this.ensureSeededIfEmpty();
+    const { data: current, error: findErr } = await this.supabase
+      .from('departments')
+      .select('id, name')
+      .eq('id', id)
+      .maybeSingle();
+    if (findErr) throw new Error(`Supabase department lookup error: ${findErr.message}`);
+    if (!current) throw httpError(404, 'Department not found.');
+
+    const { count, error: cntErr } = await this.supabase
+      .from('employees')
+      .select('*', { count: 'exact', head: true })
+      .eq('department_id', id);
+    if (cntErr) throw new Error(`Supabase department check error: ${cntErr.message}`);
+    if ((count || 0) > 0) {
+      throw httpError(
+        409,
+        `Cannot delete "${current.name}" while ${count} employee${count === 1 ? ' is' : 's are'} assigned to it. Reassign or delete them first.`
+      );
+    }
+
+    const { error } = await this.supabase.from('departments').delete().eq('id', id);
+    if (error) throw new Error(`Supabase department delete error: ${error.message}`);
+    return { deleted: true, id };
+  }
+
+  async _requireDepartment(departmentId) {
+    const { data: dept, error } = await this.supabase
+      .from('departments')
+      .select('*')
+      .eq('id', departmentId)
+      .maybeSingle();
+    if (error) throw new Error(`Supabase department lookup error: ${error.message}`);
+    if (!dept) throw httpError(400, 'Selected department does not exist.');
+    return dept;
+  }
+
+  async createEmployee(payload) {
+    const { shop } = await this.getShopAndMeta();
+    const prelimDeptId = String(payload?.department_id || '').trim();
+    if (!prelimDeptId) throw httpError(400, 'Department is required.');
+    const dept = await this._requireDepartment(prelimDeptId);
+
+    const clean = sanitizeEmployeePayload(payload, {
+      isUpdate: false,
+      fallbackColor: dept.color_hex || '#7C3AED',
     });
+
+    const { data: dup } = await this.supabase
+      .from('employees')
+      .select('id')
+      .eq('emp_code', clean.emp_code)
+      .maybeSingle();
+    if (dup) {
+      throw httpError(409, `Employee code "${clean.emp_code}" already exists.`);
+    }
+
+    const row = { id: crypto.randomUUID(), shop_id: shop.id, ...clean };
+    const { data, error } = await this.supabase
+      .from('employees')
+      .insert(row)
+      .select('*, departments(code, name, color_hex, target_monthly_sales)')
+      .single();
+    if (error) throw new Error(`Supabase employee create error: ${error.message}`);
+    return this._formatEmployeeRow(data);
+  }
+
+  async updateEmployee(id, payload) {
+    await this.ensureSeededIfEmpty();
+    const { data: current, error: findErr } = await this.supabase
+      .from('employees')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (findErr) throw new Error(`Supabase employee lookup error: ${findErr.message}`);
+    if (!current) throw httpError(404, 'Employee not found.');
+
+    let fallbackColor = current.avatar_color || '#7C3AED';
+    if (payload?.department_id !== undefined && payload.department_id !== current.department_id) {
+      const nextDept = await this._requireDepartment(String(payload.department_id).trim());
+      fallbackColor = nextDept.color_hex || fallbackColor;
+    }
+
+    const clean = sanitizeEmployeePayload(payload, { isUpdate: true, fallbackColor });
+    if (clean.emp_code && clean.emp_code !== current.emp_code) {
+      const { data: dup } = await this.supabase
+        .from('employees')
+        .select('id')
+        .eq('emp_code', clean.emp_code)
+        .neq('id', id)
+        .maybeSingle();
+      if (dup) {
+        throw httpError(409, `Employee code "${clean.emp_code}" already exists.`);
+      }
+    }
+
+    if (Object.keys(clean).length === 0) {
+      const { data } = await this.supabase
+        .from('employees')
+        .select('*, departments(code, name, color_hex, target_monthly_sales)')
+        .eq('id', id)
+        .single();
+      return this._formatEmployeeRow(data);
+    }
+
+    const { data, error } = await this.supabase
+      .from('employees')
+      .update(clean)
+      .eq('id', id)
+      .select('*, departments(code, name, color_hex, target_monthly_sales)')
+      .single();
+    if (error) throw new Error(`Supabase employee update error: ${error.message}`);
+    return this._formatEmployeeRow(data);
+  }
+
+  async deleteEmployee(id) {
+    await this.ensureSeededIfEmpty();
+    const { data: current, error: findErr } = await this.supabase
+      .from('employees')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+    if (findErr) throw new Error(`Supabase employee lookup error: ${findErr.message}`);
+    if (!current) throw httpError(404, 'Employee not found.');
+
+    const { error } = await this.supabase.from('employees').delete().eq('id', id);
+    if (error) throw new Error(`Supabase employee delete error: ${error.message}`);
+    return { deleted: true, id };
   }
 
   async getSettings() {

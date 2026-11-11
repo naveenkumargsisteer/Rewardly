@@ -42,10 +42,17 @@ export default function App() {
     setLoadingDash(true);
     setApiError('');
     try {
-      const [metaData, dashData] = await Promise.all([
-        api.getMeta(),
-        api.getDashboard({ startDate: sDate, endDate: eDate, department: dept }),
-      ]);
+      const metaData = await api.getMeta();
+      let activeDept = dept;
+      if (
+        activeDept &&
+        activeDept !== 'all' &&
+        !(metaData.departments || []).some((d) => d.code === activeDept || d.id === activeDept)
+      ) {
+        activeDept = 'all';
+        setDepartment('all');
+      }
+      const dashData = await api.getDashboard({ startDate: sDate, endDate: eDate, department: activeDept });
       setMeta(metaData);
       setDashboard(dashData);
     } catch (err) {

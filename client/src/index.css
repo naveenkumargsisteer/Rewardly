@@ -208,6 +208,17 @@ button, input, select, textarea {
   background: #059669;
 }
 
+.btn-danger {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
 .btn-sm {
   padding: 6px 10px;
   font-size: 12px;

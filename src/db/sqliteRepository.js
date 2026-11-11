@@ -2,11 +2,17 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 const { DB_PATH, runSeed } = require('../../scripts/init-local-db');
+const {
+  httpError,
+  sanitizeDepartmentPayload,
+  sanitizeEmployeePayload,
+} = require('../utils/crudValidation');
 
 class SqliteRepository {
   constructor() {
     this.ensureDbReady();
     this.db = new DatabaseSync(DB_PATH);
+    this.db.exec('PRAGMA foreign_keys = ON;');
   }
 
   ensureDbReady() {
@@ -48,6 +54,21 @@ class SqliteRepository {
     return this.db.prepare('SELECT * FROM departments ORDER BY target_monthly_sales DESC').all();
   }
 
+  _getEmployeeById(id) {
+    return this.db.prepare(`
+      SELECT e.*, d.code AS department_code, d.name AS department_name, d.color_hex AS department_color, d.target_monthly_sales
+      FROM employees e
+      JOIN departments d ON d.id = e.department_id
+      WHERE e.id = ?
+    `).get(id);
+  }
+
+  _requireDepartment(departmentId) {
+    const dept = this.db.prepare('SELECT * FROM departments WHERE id = ?').get(departmentId);
+    if (!dept) throw httpError(400, 'Selected department does not exist.');
+    return dept;
+  }
+
   async getEmployees() {
     return this.db.prepare(`
       SELECT e.*, d.code AS department_code, d.name AS department_name, d.color_hex AS department_color, d.target_monthly_sales
@@ -55,6 +76,173 @@ class SqliteRepository {
       JOIN departments d ON d.id = e.department_id
       ORDER BY e.emp_code ASC
     `).all();
+  }
+
+  async createDepartment(payload) {
+    const { shop } = await this.getShopAndMeta();
+    const clean = sanitizeDepartmentPayload(payload, { isUpdate: false });
+    const dup = this.db
+      .prepare('SELECT id FROM departments WHERE shop_id = ? AND code = ?')
+      .get(shop.id, clean.code);
+    if (dup) {
+      throw httpError(409, `Department code "${clean.code}" already exists.`);
+    }
+    const id = crypto.randomUUID();
+    this.db.prepare(`
+      INSERT INTO departments (id, shop_id, code, name, target_monthly_sales, color_hex)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, shop.id, clean.code, clean.name, clean.target_monthly_sales, clean.color_hex);
+    return this.db.prepare('SELECT * FROM departments WHERE id = ?').get(id);
+  }
+
+  async updateDepartment(id, payload) {
+    const current = this.db.prepare('SELECT * FROM departments WHERE id = ?').get(id);
+    if (!current) throw httpError(404, 'Department not found.');
+
+    const clean = sanitizeDepartmentPayload(payload, { isUpdate: true });
+    if (clean.code && clean.code !== current.code) {
+      const dup = this.db
+        .prepare('SELECT id FROM departments WHERE shop_id = ? AND code = ? AND id != ?')
+        .get(current.shop_id, clean.code, id);
+      if (dup) {
+        throw httpError(409, `Department code "${clean.code}" already exists.`);
+      }
+    }
+
+    const next = { ...current, ...clean };
+    this.db.prepare(`
+      UPDATE departments
+      SET code = ?, name = ?, target_monthly_sales = ?, color_hex = ?
+      WHERE id = ?
+    `).run(next.code, next.name, next.target_monthly_sales, next.color_hex, id);
+    return this.db.prepare('SELECT * FROM departments WHERE id = ?').get(id);
+  }
+
+  async deleteDepartment(id) {
+    const current = this.db.prepare('SELECT id, name FROM departments WHERE id = ?').get(id);
+    if (!current) throw httpError(404, 'Department not found.');
+
+    const row = this.db.prepare('SELECT COUNT(*) AS c FROM employees WHERE department_id = ?').get(id);
+    const count = Number(row?.c || 0);
+    if (count > 0) {
+      throw httpError(
+        409,
+        `Cannot delete "${current.name}" while ${count} employee${count === 1 ? ' is' : 's are'} assigned to it. Reassign or delete them first.`
+      );
+    }
+
+    this.db.prepare('DELETE FROM departments WHERE id = ?').run(id);
+    return { deleted: true, id };
+  }
+
+  async createEmployee(payload) {
+    const { shop } = await this.getShopAndMeta();
+    const deptId = String(payload?.department_id || '').trim();
+    if (!deptId) throw httpError(400, 'Department is required.');
+    const dept = this._requireDepartment(deptId);
+
+    const clean = sanitizeEmployeePayload(payload, {
+      isUpdate: false,
+      fallbackColor: dept.color_hex || '#7C3AED',
+    });
+
+    const dup = this.db.prepare('SELECT id FROM employees WHERE emp_code = ?').get(clean.emp_code);
+    if (dup) {
+      throw httpError(409, `Employee code "${clean.emp_code}" already exists.`);
+    }
+
+    const id = crypto.randomUUID();
+    this.db.prepare(`
+      INSERT INTO employees (
+        id, shop_id, department_id, emp_code, full_name, email,
+        phone, gender, role, shift, join_date, base_salary_inr,
+        avatar_initials, avatar_color, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      shop.id,
+      clean.department_id,
+      clean.emp_code,
+      clean.full_name,
+      clean.email,
+      clean.phone,
+      clean.gender,
+      clean.role,
+      clean.shift,
+      clean.join_date,
+      clean.base_salary_inr,
+      clean.avatar_initials,
+      clean.avatar_color,
+      clean.status
+    );
+    return this._getEmployeeById(id);
+  }
+
+  async updateEmployee(id, payload) {
+    const current = this.db.prepare('SELECT * FROM employees WHERE id = ?').get(id);
+    if (!current) throw httpError(404, 'Employee not found.');
+
+    let fallbackColor = current.avatar_color || '#7C3AED';
+    if (payload?.department_id !== undefined && payload.department_id !== current.department_id) {
+      const nextDept = this._requireDepartment(String(payload.department_id).trim());
+      fallbackColor = nextDept.color_hex || fallbackColor;
+    }
+
+    const clean = sanitizeEmployeePayload(payload, { isUpdate: true, fallbackColor });
+    if (clean.emp_code && clean.emp_code !== current.emp_code) {
+      const dup = this.db
+        .prepare('SELECT id FROM employees WHERE emp_code = ? AND id != ?')
+        .get(clean.emp_code, id);
+      if (dup) {
+        throw httpError(409, `Employee code "${clean.emp_code}" already exists.`);
+      }
+    }
+
+    const next = { ...current, ...clean };
+    this.db.prepare(`
+      UPDATE employees
+      SET department_id = ?, emp_code = ?, full_name = ?, email = ?,
+          phone = ?, gender = ?, role = ?, shift = ?, join_date = ?,
+          base_salary_inr = ?, avatar_initials = ?, avatar_color = ?, status = ?
+      WHERE id = ?
+    `).run(
+      next.department_id,
+      next.emp_code,
+      next.full_name,
+      next.email,
+      next.phone,
+      next.gender,
+      next.role,
+      next.shift,
+      next.join_date,
+      next.base_salary_inr,
+      next.avatar_initials,
+      next.avatar_color,
+      next.status,
+      id
+    );
+    return this._getEmployeeById(id);
+  }
+
+  async deleteEmployee(id) {
+    const current = this.db.prepare('SELECT id FROM employees WHERE id = ?').get(id);
+    if (!current) throw httpError(404, 'Employee not found.');
+
+    this.db.exec('BEGIN;');
+    try {
+      this.db.prepare('DELETE FROM sales_records WHERE employee_id = ?').run(id);
+      this.db.prepare('DELETE FROM attendance_records WHERE employee_id = ?').run(id);
+      this.db.prepare('DELETE FROM customer_feedback WHERE employee_id = ?').run(id);
+      this.db.prepare('DELETE FROM recognitions WHERE employee_id = ?').run(id);
+      this.db.prepare('UPDATE recognitions SET given_by_employee_id = NULL WHERE given_by_employee_id = ?').run(id);
+      this.db.prepare('DELETE FROM reward_recommendations WHERE employee_id = ?').run(id);
+      this.db.prepare('DELETE FROM employees WHERE id = ?').run(id);
+      this.db.exec('COMMIT;');
+    } catch (err) {
+      this.db.exec('ROLLBACK;');
+      throw err;
+    }
+    return { deleted: true, id };
   }
 
   async getSettings() {
@@ -258,6 +446,7 @@ class SqliteRepository {
     this.db.close();
     const dataset = runSeed({ writeSql: true, silent: true });
     this.db = new DatabaseSync(DB_PATH);
+    this.db.exec('PRAGMA foreign_keys = ON;');
     return {
       reset: true,
       employees: dataset.employees.length,

@@ -1,49 +1,57 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Link2, Copy, Check, ExternalLink, Play, Sliders, Store,
-  ShieldCheck, Terminal,
+  Sliders, Store, Building2, Users, Plus, UserPlus, Pencil, Trash2, Search, X, AlertTriangle,
 } from 'lucide-react';
-import { api } from '../api/client';
+import { api, formatInr } from '../api/client';
+import DepartmentModal from '../components/DepartmentModal';
+import EmployeeFormModal from '../components/EmployeeFormModal';
 
-function shiftDate(dateStr, deltaDays) {
-  const d = new Date(`${dateStr}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + deltaDays);
-  return d.toISOString().slice(0, 10);
+function getNextEmpCode(employees) {
+  let maxNum = 0;
+  for (const emp of employees || []) {
+    const match = String(emp.emp_code || '').match(/(\d+)$/);
+    if (match) {
+      maxNum = Math.max(maxNum, Number(match[1]));
+    }
+  }
+  return `KVR-${String(maxNum + 1).padStart(3, '0')}`;
 }
 
-export default function SettingsPage({ departments, onSettingsSaved, showToast }) {
+export default function SettingsPage({ onSettingsSaved, showToast }) {
   const [loading, setLoading] = useState(true);
   const [shop, setShop] = useState(null);
   const [settings, setSettings] = useState(null);
-  const [dateBounds, setDateBounds] = useState({ minDate: '2026-07-12', maxDate: '2026-11-11' });
-
-  // Exposed API Link Builder State
-  const [apiStartDate, setApiStartDate] = useState('2026-07-12');
-  const [apiEndDate, setApiEndDate] = useState('2026-11-11');
-  const [apiDepartment, setApiDepartment] = useState('all');
-  const [apiInclude, setApiInclude] = useState('all');
-  const [apiFormat, setApiFormat] = useState('json');
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [copiedCurl, setCopiedCurl] = useState(false);
-  const [previewData, setPreviewData] = useState(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-
+  const [departments, setDepartments] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [savingWeights, setSavingWeights] = useState(false);
   const [savingShop, setSavingShop] = useState(false);
 
-  async function loadSettings() {
-    setLoading(true);
+  // Employee filters
+  const [empSearch, setEmpSearch] = useState('');
+  const [empDeptFilter, setEmpDeptFilter] = useState('all');
+  const [empStatusFilter, setEmpStatusFilter] = useState('all');
+
+  // Modals state
+  const [deptModalOpen, setDeptModalOpen] = useState(false);
+  const [editingDept, setEditingDept] = useState(null);
+  const [empModalOpen, setEmpModalOpen] = useState(false);
+  const [editingEmp, setEditingEmp] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  async function loadSettings({ silent = false } = {}) {
+    if (!silent) setLoading(true);
     try {
       const data = await api.getSettings();
       setShop(data.shop);
       setSettings(data.settings);
-      setDateBounds(data.dateBounds);
-      setApiStartDate(data.dateBounds.minDate);
-      setApiEndDate(data.dateBounds.maxDate);
+      setDepartments(data.departments || []);
+      setEmployees(data.employees || []);
     } catch (err) {
       showToast(err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
@@ -51,82 +59,36 @@ export default function SettingsPage({ departments, onSettingsSaved, showToast }
     loadSettings();
   }, []);
 
+  const deptEmployeeCounts = useMemo(() => {
+    const counts = {};
+    for (const emp of employees) {
+      counts[emp.department_id] = (counts[emp.department_id] || 0) + 1;
+    }
+    return counts;
+  }, [employees]);
+
+  const filteredEmployees = useMemo(() => {
+    const q = empSearch.trim().toLowerCase();
+    return employees.filter((emp) => {
+      if (empDeptFilter !== 'all' && emp.department_id !== empDeptFilter) return false;
+      if (empStatusFilter !== 'all' && emp.status !== empStatusFilter) return false;
+      if (!q) return true;
+      return (
+        String(emp.full_name || '').toLowerCase().includes(q) ||
+        String(emp.emp_code || '').toLowerCase().includes(q) ||
+        String(emp.email || '').toLowerCase().includes(q) ||
+        String(emp.role || '').toLowerCase().includes(q) ||
+        String(emp.department_name || '').toLowerCase().includes(q)
+      );
+    });
+  }, [employees, empSearch, empDeptFilter, empStatusFilter]);
+
   if (loading || !settings || !shop) {
     return (
       <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
         Loading Rewardly settings...
       </div>
     );
-  }
-
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-  const queryParams = new URLSearchParams({
-    startDate: apiStartDate,
-    endDate: apiEndDate,
-    department: apiDepartment,
-    include: apiInclude,
-    format: apiFormat,
-  });
-  if (settings.require_export_token && settings.public_export_token) {
-    queryParams.set('apiKey', settings.public_export_token);
-  }
-  const exposedApiUrl = `${origin}/api/public/export?${queryParams.toString()}`;
-  const curlCommand = `curl -s "${exposedApiUrl}"`;
-
-  async function copyText(text, which) {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    }
-    if (which === 'link') {
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
-      showToast('Exposed Date-Range API link copied to clipboard!');
-    } else {
-      setCopiedCurl(true);
-      setTimeout(() => setCopiedCurl(false), 2000);
-      showToast('cURL command copied!');
-    }
-  }
-
-  async function handleTestApiPreview() {
-    setPreviewLoading(true);
-    try {
-      const res = await fetch(exposedApiUrl);
-      const raw = await res.text();
-      if (apiFormat === 'csv') {
-        setPreviewData({ isCsv: true, text: raw.split('\n').slice(0, 15).join('\n') });
-      } else {
-        const json = JSON.parse(raw);
-        // Trim large record arrays in UI preview while preserving exact meta counts
-        const summaryView = {
-          meta: json.meta,
-          kpis: json.kpis,
-          departments: json.departments?.slice(0, 3),
-          employees_sample: json.employees?.slice(0, 2),
-          sales_records_sample: json.sales_records?.slice(0, 2),
-          attendance_records_sample: json.attendance_records?.slice(0, 2),
-          customer_feedback_sample: json.customer_feedback?.slice(0, 2),
-          recognitions_sample: json.recognitions?.slice(0, 2),
-        };
-        setPreviewData({
-          isCsv: false,
-          counts: json.meta?.record_counts,
-          text: JSON.stringify(summaryView, null, 2),
-        });
-      }
-      showToast('Live API response fetched successfully!');
-    } catch (err) {
-      showToast(`Preview failed: ${err.message}`);
-    } finally {
-      setPreviewLoading(false);
-    }
   }
 
   const totalWeight =
@@ -142,7 +104,7 @@ export default function SettingsPage({ departments, onSettingsSaved, showToast }
       const updated = await api.updateSettings({ settings });
       setSettings(updated.settings);
       onSettingsSaved();
-      showToast('Performance weights & API token settings saved!');
+      showToast('Performance score weights saved!');
     } catch (err) {
       showToast(err.message);
     } finally {
@@ -165,210 +127,43 @@ export default function SettingsPage({ departments, onSettingsSaved, showToast }
     }
   }
 
-  async function handleToggleToken(checked) {
-    const nextSettings = { ...settings, require_export_token: checked };
-    setSettings(nextSettings);
+  async function handleDepartmentSaved(saved, isEdit) {
+    await loadSettings({ silent: true });
+    onSettingsSaved();
+    showToast(isEdit ? `Department "${saved.name}" updated!` : `Department "${saved.name}" added!`);
+  }
+
+  async function handleEmployeeSaved(saved, isEdit) {
+    await loadSettings({ silent: true });
+    onSettingsSaved();
+    showToast(isEdit ? `Employee "${saved.full_name}" updated!` : `Employee "${saved.full_name}" added!`);
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError('');
     try {
-      const updated = await api.updateSettings({ settings: { require_export_token: checked } });
-      setSettings(updated.settings);
-      showToast(checked ? 'API Key protection enabled on Export API' : 'Open access enabled on Export API');
+      if (deleteTarget.type === 'department') {
+        await api.deleteDepartment(deleteTarget.item.id);
+        showToast(`Department "${deleteTarget.item.name}" deleted.`);
+      } else {
+        await api.deleteEmployee(deleteTarget.item.id);
+        showToast(`Employee "${deleteTarget.item.full_name}" deleted.`);
+      }
+      setDeleteTarget(null);
+      await loadSettings({ silent: true });
+      onSettingsSaved();
     } catch (err) {
-      showToast(err.message);
+      setDeleteError(err.message);
+    } finally {
+      setDeleting(false);
     }
   }
 
   return (
     <div className="settings-grid">
-      {/* 1. EXPOSED DATE-RANGE EXPORT API WITH COPY LINK */}
-      <div className="card col-12">
-        <div className="card-header">
-          <div className="section-title-wrap">
-            <div className="section-icon">
-              <Link2 size={18} />
-            </div>
-            <div>
-              <h2 className="section-title">Exposed Date-Range Data Export API (Copy Link)</h2>
-              <p className="section-sub">
-                Filter all showroom data (KPIs, 30 employees, sales, attendance, customer feedback, recognitions & rewards) by date range and copy the live REST API link.
-              </p>
-            </div>
-          </div>
-          <span className="brand-badge">GET /api/public/export</span>
-        </div>
-
-        <div className="api-box">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>Quick Date Presets:</span>
-            <button
-              type="button"
-              className="ai-chip"
-              onClick={() => { setApiStartDate(dateBounds.minDate); setApiEndDate(dateBounds.maxDate); }}
-            >
-              All 4 Months ({dateBounds.minDate} to {dateBounds.maxDate})
-            </button>
-            <button
-              type="button"
-              className="ai-chip"
-              onClick={() => { setApiStartDate(shiftDate(dateBounds.maxDate, -59)); setApiEndDate(dateBounds.maxDate); }}
-            >
-              Last 60 Days
-            </button>
-            <button
-              type="button"
-              className="ai-chip"
-              onClick={() => { setApiStartDate(shiftDate(dateBounds.maxDate, -29)); setApiEndDate(dateBounds.maxDate); }}
-            >
-              Last 30 Days
-            </button>
-            <button
-              type="button"
-              className="ai-chip"
-              onClick={() => { setApiStartDate('2026-10-01'); setApiEndDate(dateBounds.maxDate); }}
-            >
-              Festive Season (Oct–Nov)
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
-            <div className="field">
-              <label className="field-label">Start Date</label>
-              <input
-                type="date"
-                className="input"
-                value={apiStartDate}
-                max={apiEndDate}
-                onChange={(e) => setApiStartDate(e.target.value)}
-              />
-            </div>
-
-            <div className="field">
-              <label className="field-label">End Date</label>
-              <input
-                type="date"
-                className="input"
-                value={apiEndDate}
-                min={apiStartDate}
-                onChange={(e) => setApiEndDate(e.target.value)}
-              />
-            </div>
-
-            <div className="field">
-              <label className="field-label">Department</label>
-              <select className="select" value={apiDepartment} onChange={(e) => setApiDepartment(e.target.value)}>
-                <option value="all">All Departments</option>
-                {(departments || []).map((d) => (
-                  <option key={d.id} value={d.code}>{d.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="field">
-              <label className="field-label">Dataset Scope</label>
-              <select className="select" value={apiInclude} onChange={(e) => setApiInclude(e.target.value)}>
-                <option value="all">All Data (Full Dump)</option>
-                <option value="summary,departments,employees">Summary + Employees Only</option>
-                <option value="sales,attendance">Sales + Attendance Logs</option>
-                <option value="feedback,recognitions,rewards">Feedback + Recognitions + Rewards</option>
-              </select>
-            </div>
-
-            <div className="field">
-              <label className="field-label">Format</label>
-              <select className="select" value={apiFormat} onChange={(e) => setApiFormat(e.target.value)}>
-                <option value="json">JSON (All Datasets)</option>
-                <option value="csv">CSV (Employee Scorecard)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* API Key Toggle */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={Boolean(settings.require_export_token)}
-                onChange={(e) => handleToggleToken(e.target.checked)}
-              />
-              <ShieldCheck size={15} color="var(--primary)" />
-              Require API Key (<code>apiKey</code>) on Export Endpoint
-            </label>
-            {settings.require_export_token && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  type="text"
-                  className="input"
-                  style={{ width: 220, height: 32, fontSize: 12 }}
-                  value={settings.public_export_token}
-                  onChange={(e) => setSettings({ ...settings, public_export_token: e.target.value })}
-                />
-                <button type="button" className="btn btn-sm" onClick={handleSaveSettings}>Save Token</button>
-              </div>
-            )}
-          </div>
-
-          {/* Live Constructed URL Box */}
-          <div className="api-url-display" data-testid="exposed-api-url">
-            {exposedApiUrl}
-          </div>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => copyText(exposedApiUrl, 'link')}
-            >
-              {copiedLink ? <Check size={15} /> : <Copy size={15} />}
-              {copiedLink ? 'Copied API Link!' : 'Copy API Link'}
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-soft"
-              onClick={handleTestApiPreview}
-              disabled={previewLoading}
-            >
-              <Play size={15} />
-              {previewLoading ? 'Fetching...' : 'Test & Preview Response'}
-            </button>
-
-            <a
-              href={exposedApiUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="btn"
-            >
-              <ExternalLink size={15} />
-              Open Link in New Tab
-            </a>
-
-            <button
-              type="button"
-              className="btn"
-              onClick={() => copyText(curlCommand, 'curl')}
-            >
-              {copiedCurl ? <Check size={15} /> : <Terminal size={15} />}
-              {copiedCurl ? 'Copied cURL!' : 'Copy cURL'}
-            </button>
-          </div>
-
-          {previewData && (
-            <div>
-              {previewData.counts && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-                  {Object.entries(previewData.counts).map(([k, v]) => (
-                    <span key={k} className="brand-badge">
-                      {k}: <strong>{v}</strong>
-                    </span>
-                  ))}
-                </div>
-              )}
-              <pre className="json-preview">{previewData.text}</pre>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 2. CONFIGURABLE PERFORMANCE SCORE WEIGHTS */}
+      {/* 1. CONFIGURABLE PERFORMANCE SCORE WEIGHTS */}
       <form className="card col-6" onSubmit={handleSaveSettings}>
         <div className="card-header">
           <div className="card-title-row">
@@ -507,6 +302,346 @@ export default function SettingsPage({ departments, onSettingsSaved, showToast }
           </div>
         </div>
       </form>
+
+      {/* 3. MANAGE DEPARTMENTS */}
+      <div className="card col-12">
+        <div className="card-header">
+          <div className="section-title-wrap">
+            <div className="section-icon">
+              <Building2 size={18} />
+            </div>
+            <div>
+              <h2 className="section-title">Manage Departments</h2>
+              <p className="section-sub">
+                Add new showroom departments, update monthly sales targets, or remove unused departments.
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="brand-badge">{departments.length} Departments</span>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => { setEditingDept(null); setDeptModalOpen(true); }}
+            >
+              <Plus size={15} /> Add Department
+            </button>
+          </div>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Department Name</th>
+                <th>Monthly Target</th>
+                <th>Assigned Staff</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {departments.length === 0 ? (
+                <tr style={{ cursor: 'default' }}>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>
+                    No departments found. Click &ldquo;Add Department&rdquo; to create one.
+                  </td>
+                </tr>
+              ) : departments.map((dept) => {
+                const staffCount = deptEmployeeCounts[dept.id] || 0;
+                return (
+                  <tr key={dept.id} style={{ cursor: 'default' }}>
+                    <td>
+                      <span className="brand-badge">{dept.code}</span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            background: dept.color_hex || '#7C3AED',
+                            flexShrink: 0,
+                          }}
+                        />
+                        <strong>{dept.name}</strong>
+                      </div>
+                    </td>
+                    <td className="tabular-nums">{formatInr(dept.target_monthly_sales)}</td>
+                    <td className="tabular-nums">
+                      {staffCount} {staffCount === 1 ? 'employee' : 'employees'}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'inline-flex', gap: 6 }}>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => { setEditingDept(dept); setDeptModalOpen(true); }}
+                        >
+                          <Pencil size={13} /> Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger"
+                          onClick={() => { setDeleteError(''); setDeleteTarget({ type: 'department', item: dept }); }}
+                        >
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 4. MANAGE EMPLOYEES */}
+      <div className="card col-12">
+        <div className="card-header">
+          <div className="section-title-wrap">
+            <div className="section-icon">
+              <Users size={18} />
+            </div>
+            <div>
+              <h2 className="section-title">Manage Employees</h2>
+              <p className="section-sub">
+                Add new staff profiles, edit roles, shifts, salaries, or department assignments, and remove profiles.
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="brand-badge">{employees.length} Employees</span>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={departments.length === 0}
+              onClick={() => { setEditingEmp(null); setEmpModalOpen(true); }}
+            >
+              <UserPlus size={15} /> Add Employee
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14, alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: 360 }}>
+            <Search
+              size={15}
+              style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}
+            />
+            <input
+              type="text"
+              className="input"
+              style={{ paddingLeft: 32 }}
+              placeholder="Search name, code, email, or role..."
+              value={empSearch}
+              onChange={(e) => setEmpSearch(e.target.value)}
+            />
+          </div>
+          <select
+            className="select"
+            style={{ width: 'auto', minWidth: 190 }}
+            value={empDeptFilter}
+            onChange={(e) => setEmpDeptFilter(e.target.value)}
+          >
+            <option value="all">All Departments</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+          <select
+            className="select"
+            style={{ width: 'auto', minWidth: 140 }}
+            value={empStatusFilter}
+            onChange={(e) => setEmpStatusFilter(e.target.value)}
+          >
+            <option value="all">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+
+        <div style={{ overflowX: 'auto', maxHeight: 460, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 12 }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Code</th>
+                <th>Department</th>
+                <th>Role &amp; Shift</th>
+                <th>Salary &amp; Joined</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEmployees.length === 0 ? (
+                <tr style={{ cursor: 'default' }}>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: 28, color: 'var(--text-muted)' }}>
+                    No employees match the current filters.
+                  </td>
+                </tr>
+              ) : filteredEmployees.map((emp) => (
+                <tr key={emp.id} style={{ cursor: 'default' }}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        className="avatar"
+                        style={{ background: emp.avatar_color || '#7C3AED', width: 34, height: 34, fontSize: 12 }}
+                      >
+                        {emp.avatar_initials}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700 }}>{emp.full_name}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{emp.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span className="brand-badge">{emp.emp_code}</span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          background: emp.department_color || '#7C3AED',
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span>{emp.department_name}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{emp.role}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{emp.shift}</div>
+                  </td>
+                  <td>
+                    <div className="tabular-nums" style={{ fontWeight: 600 }}>{formatInr(emp.base_salary_inr)}</div>
+                    <div className="tabular-nums" style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                      {String(emp.join_date || '').slice(0, 10)}
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`status-badge ${emp.status === 'active' ? 'status-Approved' : 'status-Dismissed'}`}>
+                      {emp.status === 'active' ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'inline-flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => { setEditingEmp(emp); setEmpModalOpen(true); }}
+                      >
+                        <Pencil size={13} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger"
+                        onClick={() => { setDeleteError(''); setDeleteTarget({ type: 'employee', item: emp }); }}
+                      >
+                        <Trash2 size={13} /> Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <DepartmentModal
+        isOpen={deptModalOpen}
+        initialDepartment={editingDept}
+        onClose={() => setDeptModalOpen(false)}
+        onSaved={handleDepartmentSaved}
+      />
+
+      <EmployeeFormModal
+        isOpen={empModalOpen}
+        initialEmployee={editingEmp}
+        departments={departments}
+        suggestedCode={getNextEmpCode(employees)}
+        onClose={() => setEmpModalOpen(false)}
+        onSaved={handleEmployeeSaved}
+      />
+
+      {deleteTarget && (
+        <div className="modal-backdrop" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="modal-card narrow" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AlertTriangle size={18} color="#dc2626" />
+                <strong style={{ fontSize: 16 }}>
+                  Delete {deleteTarget.type === 'department' ? 'Department' : 'Employee'}
+                </strong>
+              </div>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => !deleting && setDeleteTarget(null)}
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55 }}>
+                {deleteTarget.type === 'department' ? (
+                  <>
+                    Are you sure you want to delete department <strong>{deleteTarget.item.name}</strong> ({deleteTarget.item.code})?
+                  </>
+                ) : (
+                  <>
+                    Are you sure you want to delete employee <strong>{deleteTarget.item.full_name}</strong> ({deleteTarget.item.emp_code})? This will also remove their sales, attendance, feedback, and recognition history.
+                  </>
+                )}
+              </p>
+
+              {deleteError && (
+                <div
+                  role="alert"
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    color: '#991b1b',
+                    fontSize: 13,
+                  }}
+                >
+                  {deleteError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={handleConfirmDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? 'Deleting...' : 'Confirm Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

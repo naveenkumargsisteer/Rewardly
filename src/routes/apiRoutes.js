@@ -115,6 +115,76 @@ router.get('/employees/:id', async (req, res, next) => {
   }
 });
 
+router.post('/employees', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const created = await repo.createEmployee(req.body || {});
+    res.status(201).json(created);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/employees/:id', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const updated = await repo.updateEmployee(req.params.id, req.body || {});
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/employees/:id', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const result = await repo.deleteEmployee(req.params.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/departments', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const departments = await repo.getDepartments();
+    res.json({ departments });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/departments', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const created = await repo.createDepartment(req.body || {});
+    res.status(201).json(created);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.put('/departments/:id', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const updated = await repo.updateDepartment(req.params.id, req.body || {});
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/departments/:id', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const result = await repo.deleteDepartment(req.params.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/recognitions', async (req, res, next) => {
   try {
     const { employee_id, given_by_name, recognition_type, badge_title, points, message, recognition_date } = req.body || {};
@@ -191,12 +261,19 @@ router.post('/ai/query', async (req, res, next) => {
 router.get('/settings', async (req, res, next) => {
   try {
     const repo = getRepository();
-    const [meta, settings] = await Promise.all([repo.getShopAndMeta(), repo.getSettings()]);
+    const [meta, settings, departments, employees] = await Promise.all([
+      repo.getShopAndMeta(),
+      repo.getSettings(),
+      repo.getDepartments(),
+      repo.getEmployees(),
+    ]);
     res.json({
       shop: meta.shop,
       dateBounds: meta.dateBounds,
       counts: meta.counts,
       settings,
+      departments,
+      employees,
       backend: getBackendStatus(),
     });
   } catch (err) {
