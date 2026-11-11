@@ -3,6 +3,7 @@ import { Bar } from 'react-chartjs-2';
 import { X, Search, ArrowLeft, Award, Calculator } from 'lucide-react';
 import './chartSetup';
 import { api, formatCompactInr, formatInr } from '../api/client';
+import RewardlyLoader from './RewardlyLoader';
 
 export default function EmployeesModal({
   isOpen,
@@ -90,9 +91,7 @@ export default function EmployeesModal({
         <div className="modal-body">
           {selectedId ? (
             loadingDetail || !detail ? (
-              <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>
-                Loading employee report...
-              </div>
+              <RewardlyLoader variant="compact" message="Loading employee report..." />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>

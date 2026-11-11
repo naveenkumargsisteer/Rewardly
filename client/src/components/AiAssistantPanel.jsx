@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Sparkles,
-  Bot,
   Send,
   CheckCircle2,
   XCircle,
@@ -109,7 +108,7 @@ export default function AiAssistantPanel({
         title="Rewardly AI Assistant"
       >
         <span className="ai-launcher-icon">
-          <Bot size={20} />
+          <img src="/rewardly-logo.png" alt="Rewardly AI" className="ai-logo-img" />
         </span>
         <span className="ai-launcher-expand">
           <span className="ai-launcher-label">Rewardly AI Assistant</span>
@@ -177,7 +176,7 @@ export default function AiAssistantPanel({
               <div key={m.id} className={`ai-msg-row ${m.sender === 'user' ? 'user' : ''}`}>
                 {m.sender === 'bot' && (
                   <div className="ai-bot-avatar">
-                    <Bot size={17} />
+                    <img src="/rewardly-logo.png" alt="Rewardly AI" className="ai-logo-img" />
                   </div>
                 )}
                 <div className={`ai-bubble ${m.sender === 'user' ? 'user' : ''}`}>
@@ -262,7 +261,9 @@ export default function AiAssistantPanel({
             ))}
             {asking && (
               <div className="ai-msg-row">
-                <div className="ai-bot-avatar"><Bot size={17} /></div>
+                <div className="ai-bot-avatar loading">
+                  <img src="/rewardly-logo.png" alt="Rewardly AI thinking" className="ai-logo-img" />
+                </div>
                 <div className="ai-bubble">Creating chart from showroom data...</div>
               </div>
             )}

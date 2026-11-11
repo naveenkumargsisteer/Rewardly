@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Award, Bell, ChevronDown, Settings, Sparkles, Store,
+  Award, Bell, ChevronDown, Settings,
 } from 'lucide-react';
 
 function getOwnerInitials(name) {
@@ -58,13 +58,12 @@ export default function TopHeader({
           onClick={() => goToPage('dashboard')}
           title="Rewardly Dashboard"
           aria-label="Go to Dashboard"
-          style={{ border: 'none', cursor: 'pointer', flexShrink: 0 }}
         >
-          <Sparkles size={19} />
+          <img src="/rewardly-logo.png" alt="Rewardly logo" className="brand-logo-img" />
         </button>
         <div>
           <h1 className="brand-title">
-            {activePage === 'settings' ? 'Settings' : 'Performance & Loyalty Dashboard'}
+            {activePage === 'settings' ? 'Rewardly Settings' : 'Rewardly Performance & Loyalty'}
             <span className="brand-badge">{shop?.name || 'Kaveri Silks & Textiles'}</span>
           </h1>
           <p className="brand-subtitle">
@@ -195,8 +194,8 @@ export default function TopHeader({
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 11.5, color: 'var(--text-muted)' }}>
-                  <Store size={13} color="var(--primary)" />
-                  <span>{employeeCount ?? 30} Staff • 4-Month Window</span>
+                  <img src="/rewardly-logo.png" alt="Rewardly" style={{ width: 15, height: 15, objectFit: 'contain' }} />
+                  <span>Rewardly • {employeeCount ?? 30} Staff • 4-Month Window</span>
                 </div>
               </div>
 

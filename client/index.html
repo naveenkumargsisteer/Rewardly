@@ -3,11 +3,76 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rewardly — AI Employee Performance, Loyalty & Reward Recognition</title>
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="shortcut icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/rewardly-logo.png" />
+    <title>Rewardly — AI Employee Performance, Loyalty &amp; Reward Recognition</title>
+    <style>
+      @keyframes rwBootFloat {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-5px) scale(1.04); }
+      }
+      @keyframes rwBootSpin {
+        to { transform: rotate(360deg); }
+      }
+      .rw-boot-wrap {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: radial-gradient(circle at top left, #eef2ff 0%, #f4f6fb 40%, #f7f5fc 100%);
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #646b82;
+      }
+      .rw-boot-stage {
+        position: relative;
+        width: 84px;
+        height: 84px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .rw-boot-ring {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 2.5px solid rgba(109, 40, 217, 0.14);
+        border-top-color: #6d28d9;
+        animation: rwBootSpin 1.1s linear infinite;
+      }
+      .rw-boot-badge {
+        width: 66px;
+        height: 66px;
+        border-radius: 18px;
+        background: #ffffff;
+        border: 1px solid #e4dbff;
+        box-shadow: 0 12px 28px rgba(109, 40, 217, 0.18);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: rwBootFloat 1.8s ease-in-out infinite;
+      }
+      .rw-boot-badge img {
+        width: 44px;
+        height: 44px;
+        object-fit: contain;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="rw-boot-wrap" aria-label="Loading Rewardly">
+        <div class="rw-boot-stage">
+          <span class="rw-boot-ring"></span>
+          <div class="rw-boot-badge">
+            <img src="/rewardly-logo.png" alt="Rewardly" />
+          </div>
+        </div>
+        <div style="font-size: 13px; font-weight: 600;">Loading Rewardly...</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
-

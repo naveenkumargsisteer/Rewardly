@@ -5,6 +5,7 @@ import {
 import { api, formatInr } from '../api/client';
 import DepartmentModal from '../components/DepartmentModal';
 import EmployeeFormModal from '../components/EmployeeFormModal';
+import RewardlyLoader from '../components/RewardlyLoader';
 
 function getNextEmpCode(employees) {
   let maxNum = 0;
@@ -91,9 +92,7 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
             <ArrowLeft size={15} /> Back to Dashboard
           </button>
         </div>
-        <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-          Loading Rewardly settings...
-        </div>
+        <RewardlyLoader message="Loading Rewardly settings..." />
       </div>
     );
   }

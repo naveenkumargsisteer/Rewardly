@@ -7,6 +7,7 @@ import RecognitionDonutCard from '../components/RecognitionDonutCard';
 import TopEmployeesCard from '../components/TopEmployeesCard';
 import CustomDashboardWorkspace, { DEFAULT_CUSTOM_WIDGETS } from '../components/CustomDashboardWorkspace';
 import AiAssistantPanel from '../components/AiAssistantPanel';
+import RewardlyLoader from '../components/RewardlyLoader';
 
 const STORAGE_KEY = 'rewardly_custom_widgets_v1';
 
@@ -190,10 +191,12 @@ export default function DashboardPage({
           </div>
         </div>
 
+        {loading && dashboard && (
+          <RewardlyLoader variant="pill" message="Updating showroom metrics..." />
+        )}
+
         {loading && !dashboard ? (
-          <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-            Loading Kaveri Silks & Textiles dashboard metrics...
-          </div>
+          <RewardlyLoader message="Loading Kaveri Silks & Textiles dashboard metrics..." />
         ) : (
           <>
             <KpiCards
