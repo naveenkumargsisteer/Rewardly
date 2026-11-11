@@ -20,19 +20,6 @@ function makeUuid(prefixNum, index) {
   return `10000000-${p}-4000-8000-${i}`;
 }
 
-function formatDate(d) {
-  const year = d.getUTCFullYear();
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function addDays(dateStr, days) {
-  const d = new Date(`${dateStr}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d;
-}
-
 const START_DATE = '2026-07-12';
 const END_DATE = '2026-11-11';
 const SHOP_ID = makeUuid(1, 1);
@@ -148,26 +135,14 @@ function getInitials(name) {
   return ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase();
 }
 
-function getMonthFactor(dateStr) {
-  // Reflects authentic Indian textile season: July baseline -> Diwali/Wedding peak in Oct-Nov
-  const ym = dateStr.slice(0, 7);
-  switch (ym) {
-    case '2026-07': return 0.78;
-    case '2026-08': return 0.88;
-    case '2026-09': return 0.98;
-    case '2026-10': return 1.18;
-    case '2026-11': return 1.24;
-    default: return 1.0;
-  }
-}
-
-function getMonthProgress(dateStr) {
-  // 0.0 at START_DATE -> 1.0 at END_DATE
-  const startMs = Date.parse(`${START_DATE}T00:00:00Z`);
-  const endMs = Date.parse(`${END_DATE}T00:00:00Z`);
-  const curMs = Date.parse(`${dateStr}T00:00:00Z`);
-  return Math.max(0, Math.min(1, (curMs - startMs) / (endMs - startMs)));
-}
+const SEED_PERIODS = [
+  { date: '2026-07-12', monthFactor: 0.80, daySpan: 20, progress: 0.05 },
+  { date: '2026-08-15', monthFactor: 0.90, daySpan: 31, progress: 0.28 },
+  { date: '2026-09-18', monthFactor: 1.00, daySpan: 30, progress: 0.56 },
+  { date: '2026-10-05', monthFactor: 1.14, daySpan: 16, progress: 0.72 },
+  { date: '2026-10-24', monthFactor: 1.22, daySpan: 15, progress: 0.86 },
+  { date: '2026-11-11', monthFactor: 1.26, daySpan: 11, progress: 1.00 },
+];
 
 function generateSeedDataset() {
   const rng = createRng(20261111);
@@ -211,17 +186,10 @@ function generateSeedDataset() {
   let fbIdCounter = 1;
   let recIdCounter = 1;
 
-  // Iterate each day from START_DATE to END_DATE (123 days)
-  for (let dayOffset = 0; ; dayOffset++) {
-    const dateObj = addDays(START_DATE, dayOffset);
-    const dateStr = formatDate(dateObj);
-    if (dateStr > END_DATE) break;
-
-    const dow = dateObj.getUTCDay(); // 0=Sun, 6=Sat
-    const isWeekend = dow === 0 || dow === 6;
-    const weekendBoost = isWeekend ? 1.38 : 0.92;
-    const seasonalFactor = getMonthFactor(dateStr);
-    const progress = getMonthProgress(dateStr);
+  // Compact 6-period seed across 4 months (30 employees x 6 periods = 180 compact rows per core table)
+  for (let pIdx = 0; pIdx < SEED_PERIODS.length; pIdx++) {
+    const period = SEED_PERIODS[pIdx];
+    const dateStr = period.date;
 
     for (let empIdx = 0; empIdx < employees.length; empIdx++) {
       const emp = employees[empIdx];
@@ -229,59 +197,32 @@ function generateSeedDataset() {
       const dept = emp._dept;
       const deptCount = deptCounts[dept.code];
 
-      // Each employee gets a staggered weekly off (Mon-Thu, never Sat/Sun in retail!)
-      const offDow = 1 + (empIdx % 4); // 1=Mon..4=Thu
-      const isWeeklyOff = dow === offDow;
-
-      if (isWeeklyOff) {
-        attendance_records.push({
-          id: makeUuid(5, attIdCounter++),
-          shop_id: SHOP_ID,
-          employee_id: emp.id,
-          attendance_date: dateStr,
-          status: 'Weekly-Off',
-          check_in: null,
-          check_out: null,
-          hours_worked: 0,
-          late_minutes: 0,
-        });
-        continue;
-      }
-
-      // Determine attendance status
+      // Attendance record
       const attRoll = rng();
-      const punct = Math.min(0.99, spec.punct + progress * 0.02);
+      const punct = Math.min(0.98, spec.punct + period.progress * 0.02);
       let attStatus = 'Present';
       let lateMins = 0;
-      let hoursWorked = 9.0 + Math.round((rng() * 0.8 - 0.2) * 10) / 10;
+      let hoursWorked = 9.0;
       let checkInHour = emp.shift.startsWith('Morning') ? 10 : 11;
       let checkInMin = emp.shift.startsWith('Morning') ? 0 : 30;
 
       if (attRoll < punct) {
         attStatus = 'Present';
-        checkInMin = Math.max(0, checkInMin - Math.floor(rng() * 8));
-      } else if (attRoll < punct + (1 - punct) * 0.58) {
+      } else if (attRoll < punct + (1 - punct) * 0.65) {
         attStatus = 'Late';
-        lateMins = 12 + Math.floor(rng() * 38);
+        lateMins = 15 + Math.floor(rng() * 30);
         const totalMins = checkInHour * 60 + checkInMin + lateMins;
         checkInHour = Math.floor(totalMins / 60);
         checkInMin = totalMins % 60;
-        hoursWorked = Math.max(7.2, hoursWorked - lateMins / 60);
-      } else if (attRoll < punct + (1 - punct) * 0.80) {
-        attStatus = 'Half-Day';
-        hoursWorked = 4.5 + Math.round(rng() * 5) / 10;
+        hoursWorked = 8.4;
       } else {
-        attStatus = 'Leave';
-        hoursWorked = 0;
+        attStatus = 'Half-Day';
+        hoursWorked = 4.5;
       }
 
-      const checkInStr = attStatus === 'Leave'
-        ? null
-        : `${String(checkInHour).padStart(2, '0')}:${String(checkInMin).padStart(2, '0')}`;
+      const checkInStr = `${String(checkInHour).padStart(2, '0')}:${String(checkInMin).padStart(2, '0')}`;
       const checkOutHour = attStatus === 'Half-Day' ? checkInHour + 5 : checkInHour + 9;
-      const checkOutStr = attStatus === 'Leave'
-        ? null
-        : `${String(Math.min(22, checkOutHour)).padStart(2, '0')}:${String(checkInMin).padStart(2, '0')}`;
+      const checkOutStr = `${String(Math.min(22, checkOutHour)).padStart(2, '0')}:${String(checkInMin).padStart(2, '0')}`;
 
       attendance_records.push({
         id: makeUuid(5, attIdCounter++),
@@ -291,22 +232,17 @@ function generateSeedDataset() {
         status: attStatus,
         check_in: checkInStr,
         check_out: checkOutStr,
-        hours_worked: Math.round(hoursWorked * 100) / 100,
+        hours_worked: hoursWorked,
         late_minutes: lateMins,
       });
 
-      if (attStatus === 'Leave') continue;
-
-      // Daily sales per employee (26 working days/month baseline)
-      const baseDailyTarget = dept.target_monthly_sales / deptCount / 26;
-      const halfDayScale = attStatus === 'Half-Day' ? 0.52 : 1.0;
-      const growthScale = 1 + (spec.growth * progress);
-      const noise = 0.78 + rng() * 0.44;
-      const grossAmount = Math.round(
-        (baseDailyTarget * spec.perf * seasonalFactor * weekendBoost * halfDayScale * growthScale * noise) / 10
-      ) * 10;
-      const returnsAmount = rng() < 0.14 ? Math.round((grossAmount * (0.02 + rng() * 0.05)) / 10) * 10 : 0;
-      const netAmount = Math.max(0, grossAmount - returnsAmount);
+      // Sales record proportional to period daySpan so monthly & date-range targets align cleanly
+      const periodTarget = (dept.target_monthly_sales / deptCount) * (period.daySpan / 30);
+      const growthScale = 1 + (spec.growth * period.progress);
+      const noise = 0.90 + rng() * 0.20;
+      const netAmount = Math.round((periodTarget * spec.perf * period.monthFactor * growthScale * noise) / 100) * 100;
+      const returnsAmount = rng() < 0.25 ? Math.round((netAmount * 0.025) / 100) * 100 : 0;
+      const grossAmount = netAmount + returnsAmount;
 
       const avgTicket = dept.code === 'SILK' ? 14500
         : dept.code === 'ETHN' ? 12000
@@ -315,11 +251,11 @@ function generateSeedDataset() {
               : dept.code === 'HOME' ? 4200
                 : 2400;
 
-      const billsCount = Math.max(1, Math.round(grossAmount / (avgTicket * (0.85 + rng() * 0.35))));
-      const itemsSold = Math.max(billsCount, Math.round(billsCount * (1.4 + rng() * 1.5)));
-      const upsellCount = Math.floor(billsCount * (0.25 + spec.perf * 0.18 * rng()));
+      const billsCount = Math.max(2, Math.round(grossAmount / avgTicket));
+      const itemsSold = Math.max(billsCount, Math.round(billsCount * 1.8));
+      const upsellCount = Math.max(1, Math.round(billsCount * 0.3));
       const categories = TEXTILE_CATEGORIES[dept.code];
-      const category = categories[Math.floor(rng() * categories.length)];
+      const category = categories[(empIdx + pIdx) % categories.length];
 
       sales_records.push({
         id: makeUuid(4, salesIdCounter++),
@@ -335,16 +271,15 @@ function generateSeedDataset() {
         category,
       });
 
-      // Customer feedback (~30% of working days per employee -> ~900+ entries over 4 months)
-      if (rng() < 0.30) {
-        const rawRating = spec.rating + (rng() - 0.45) * 0.9 + progress * 0.12;
-        const clamped = Math.max(2.5, Math.min(5.0, rawRating));
-        const rating = Math.round(clamped * 2) / 2;
+      // Customer feedback (2 reviews per employee across the 4 months -> 60 total rows)
+      if (pIdx === 1 || pIdx === 4) {
+        const rawRating = spec.rating + (rng() - 0.5) * 0.4 + period.progress * 0.08;
+        const rating = Math.round(Math.max(3.0, Math.min(5.0, rawRating)) * 2) / 2;
         const sentiment = rating >= 4.0 ? 'Positive' : rating >= 3.5 ? 'Neutral' : 'Needs-Attention';
-        const customerName = INDIAN_CUSTOMERS[Math.floor(rng() * INDIAN_CUSTOMERS.length)];
+        const customerName = INDIAN_CUSTOMERS[(empIdx + pIdx) % INDIAN_CUSTOMERS.length];
         const commentList = sentiment === 'Positive' ? POSITIVE_COMMENTS : NEUTRAL_COMMENTS;
-        const comment = commentList[Math.floor(rng() * commentList.length)];
-        const channel = rng() < 0.55 ? 'In-Store QR' : rng() < 0.85 ? 'WhatsApp Receipt' : 'Google Review';
+        const comment = commentList[(empIdx + pIdx) % commentList.length];
+        const channel = pIdx === 1 ? 'In-Store QR' : 'WhatsApp Receipt';
 
         customer_feedback.push({
           id: makeUuid(6, fbIdCounter++),
@@ -359,19 +294,10 @@ function generateSeedDataset() {
         });
       }
 
-      // Recognitions (~14% chance per active employee-day * recBias -> ~450+ recognitions over 4 months)
-      const recProb = 0.125 * spec.recBias * (0.85 + progress * 0.45);
-      if (rng() < recProb) {
-        const typeRoll = rng();
-        let chosenSpec;
-        if (typeRoll < 0.52) chosenSpec = RECOGNITION_BADGES[0]; // Peer-to-Peer (~52-58%)
-        else if (typeRoll < 0.78) chosenSpec = RECOGNITION_BADGES[1]; // Manager (~26%)
-        else if (typeRoll < 0.91) chosenSpec = RECOGNITION_BADGES[2]; // Customer Praise (~13%)
-        else chosenSpec = RECOGNITION_BADGES[3]; // Milestone (~9%)
-
-        let peerIdx = Math.floor(rng() * employees.length);
-        if (peerIdx === empIdx) peerIdx = (empIdx + 1) % employees.length;
-        const peer = employees[peerIdx];
+      // Recognitions (3 milestones/recognitions per employee -> 90 total rows)
+      if (pIdx === 0 || pIdx === 2 || pIdx === 5) {
+        const chosenSpec = RECOGNITION_BADGES[(empIdx + pIdx) % RECOGNITION_BADGES.length];
+        const peer = employees[(empIdx + 1) % employees.length];
         const givenByName = chosenSpec.type === 'Manager'
           ? SHOP.owner_name
           : chosenSpec.type === 'Customer Praise'
@@ -380,7 +306,8 @@ function generateSeedDataset() {
               ? 'Rewardly AI System'
               : peer.full_name;
         const givenByEmpId = chosenSpec.type === 'Peer-to-Peer' ? peer.id : null;
-        const msg = chosenSpec.messages[Math.floor(rng() * chosenSpec.messages.length)];
+        const msg = chosenSpec.messages[(empIdx + pIdx) % chosenSpec.messages.length];
+        const scaledPoints = Math.round(chosenSpec.points * 4.5 * spec.recBias);
 
         recognitions.push({
           id: makeUuid(7, recIdCounter++),
@@ -390,7 +317,7 @@ function generateSeedDataset() {
           given_by_name: givenByName,
           recognition_type: chosenSpec.type,
           badge_title: chosenSpec.badge,
-          points: chosenSpec.points,
+          points: scaledPoints,
           message: msg,
           recognition_date: dateStr,
           status: 'Approved',
