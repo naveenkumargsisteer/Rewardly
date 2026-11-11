@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Link2, Copy, Check, ExternalLink, Play, Sliders, Store, Database,
-  RefreshCw, FileCode2, ShieldCheck, Terminal,
+  Link2, Copy, Check, ExternalLink, Play, Sliders, Store,
+  ShieldCheck, Terminal,
 } from 'lucide-react';
 import { api } from '../api/client';
 
@@ -15,9 +15,7 @@ export default function SettingsPage({ departments, onSettingsSaved, showToast }
   const [loading, setLoading] = useState(true);
   const [shop, setShop] = useState(null);
   const [settings, setSettings] = useState(null);
-  const [counts, setCounts] = useState(null);
   const [dateBounds, setDateBounds] = useState({ minDate: '2026-07-12', maxDate: '2026-11-11' });
-  const [backend, setBackend] = useState(null);
 
   // Exposed API Link Builder State
   const [apiStartDate, setApiStartDate] = useState('2026-07-12');
@@ -30,15 +28,8 @@ export default function SettingsPage({ departments, onSettingsSaved, showToast }
   const [previewData, setPreviewData] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
-  // Supabase Tester & Schema Viewer
-  const [sbUrl, setSbUrl] = useState('');
-  const [sbKey, setSbKey] = useState('');
-  const [sbTestResult, setSbTestResult] = useState(null);
-  const [schemaText, setSchemaText] = useState('');
-  const [showSchema, setShowSchema] = useState(false);
   const [savingWeights, setSavingWeights] = useState(false);
   const [savingShop, setSavingShop] = useState(false);
-  const [reseeding, setReseeding] = useState(false);
 
   async function loadSettings() {
     setLoading(true);
@@ -46,9 +37,7 @@ export default function SettingsPage({ departments, onSettingsSaved, showToast }
       const data = await api.getSettings();
       setShop(data.shop);
       setSettings(data.settings);
-      setCounts(data.counts);
       setDateBounds(data.dateBounds);
-      setBackend(data.backend);
       setApiStartDate(data.dateBounds.minDate);
       setApiEndDate(data.dateBounds.maxDate);
     } catch (err) {
@@ -185,45 +174,6 @@ export default function SettingsPage({ departments, onSettingsSaved, showToast }
       showToast(checked ? 'API Key protection enabled on Export API' : 'Open access enabled on Export API');
     } catch (err) {
       showToast(err.message);
-    }
-  }
-
-  async function handleTestSupabase(e) {
-    e.preventDefault();
-    setSbTestResult({ ok: null, message: 'Testing connection...' });
-    try {
-      const res = await api.testSupabase({ url: sbUrl, key: sbKey });
-      setSbTestResult(res);
-    } catch (err) {
-      setSbTestResult({ ok: false, message: err.message });
-    }
-  }
-
-  async function handleViewSchema() {
-    if (!showSchema && !schemaText) {
-      try {
-        const sql = await api.getSupabaseSchema();
-        setSchemaText(sql);
-      } catch (err) {
-        showToast(err.message);
-        return;
-      }
-    }
-    setShowSchema((v) => !v);
-  }
-
-  async function handleReseed() {
-    if (!window.confirm('Reset and re-seed all 4 months of data for 30 Indian employees?')) return;
-    setReseeding(true);
-    try {
-      const res = await api.resetSeed();
-      await loadSettings();
-      onSettingsSaved();
-      showToast(`Re-seeded ${res.employees} employees and ${res.sales_records} sales records!`);
-    } catch (err) {
-      showToast(err.message);
-    } finally {
-      setReseeding(false);
     }
   }
 
@@ -557,88 +507,6 @@ export default function SettingsPage({ departments, onSettingsSaved, showToast }
           </div>
         </div>
       </form>
-
-      {/* 4. SUPABASE SCHEMA, CONNECTION & SEED DATA */}
-      <div className="card col-12">
-        <div className="card-header">
-          <div className="card-title-row">
-            <Database size={18} color="#10b981" />
-            <span>Supabase Schema, Data Backend & 4-Month Seed Manager</span>
-          </div>
-          <span className="status-badge status-Approved">Active: {backend?.label}</span>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18 }}>
-          <div>
-            <strong style={{ fontSize: 13 }}>Seeded Database Records ({dateBounds.minDate} to {dateBounds.maxDate})</strong>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-              {counts && Object.entries(counts).map(([k, v]) => (
-                <span key={k} className="brand-badge">
-                  {k}: <strong>{v.toLocaleString('en-IN')}</strong>
-                </span>
-              ))}
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 14 }}>
-              <button type="button" className="btn btn-soft" onClick={handleViewSchema}>
-                <FileCode2 size={15} />
-                {showSchema ? 'Hide Supabase schema.sql' : 'View Supabase schema.sql'}
-              </button>
-              <button type="button" className="btn" onClick={handleReseed} disabled={reseeding}>
-                <RefreshCw size={15} />
-                {reseeding ? 'Re-seeding...' : 'Reset & Re-seed 4-Month Data'}
-              </button>
-            </div>
-          </div>
-
-          <form onSubmit={handleTestSupabase} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <strong style={{ fontSize: 13 }}>Vercel + Supabase Cloud Connection</strong>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-              For Vercel deployment, set <code>SUPABASE_URL</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code> (or <code>SUPABASE_ANON_KEY</code>), and <code>DATA_SOURCE=supabase</code> in Vercel Project Environment Variables.
-            </div>
-            <input
-              type="url"
-              className="input"
-              placeholder="SUPABASE_URL (https://xxxx.supabase.co)"
-              value={sbUrl}
-              onChange={(e) => setSbUrl(e.target.value)}
-            />
-            <input
-              type="password"
-              className="input"
-              placeholder="SUPABASE_ANON_KEY or SERVICE_ROLE_KEY"
-              value={sbKey}
-              onChange={(e) => setSbKey(e.target.value)}
-            />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <button type="submit" className="btn btn-sm btn-primary">Test Connection</button>
-              {sbTestResult && (
-                <span style={{ fontSize: 12, color: sbTestResult.ok ? '#059669' : '#dc2626', fontWeight: 600 }}>
-                  {sbTestResult.message}
-                </span>
-              )}
-            </div>
-          </form>
-        </div>
-
-        {showSchema && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 700 }}>supabase/schema.sql</span>
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(schemaText);
-                  showToast('Supabase schema.sql copied!');
-                }}
-              >
-                <Copy size={13} /> Copy SQL
-              </button>
-            </div>
-            <pre className="json-preview">{schemaText}</pre>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
