@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { api } from './api/client';
-import SidebarMenu from './components/SidebarMenu';
 import TopHeader from './components/TopHeader';
 import DashboardPage from './pages/DashboardPage';
 import SettingsPage from './pages/SettingsPage';
@@ -11,8 +10,6 @@ import GiveRecognitionModal from './components/GiveRecognitionModal';
 export default function App() {
   const initialPage = window.location.pathname.includes('settings') ? 'settings' : 'dashboard';
   const [activePage, setActivePage] = useState(initialPage);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiTab, setAiTab] = useState('chat');
 
@@ -117,36 +114,24 @@ export default function App() {
   const pendingRewards = (dashboard?.rewards || []).filter((r) => r.status === 'Pending');
 
   return (
-    <div className="app-layout">
-      <SidebarMenu
+    <div className="app-shell">
+      <TopHeader
         activePage={activePage}
         onNavigate={handleNavigate}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
-        mobileOpen={mobileMenuOpen}
-        onCloseMobile={() => setMobileMenuOpen(false)}
         shop={dashboard?.meta?.shop || meta?.shop}
         employeeCount={meta?.counts?.employees}
+        pendingRewards={pendingRewards}
+        onOpenRecognize={() => {
+          setRecognizeEmpId(null);
+          setRecognizeModalOpen(true);
+        }}
+        onSelectInsightsTab={() => {
+          setAiTab('insights');
+          setAiOpen(true);
+        }}
       />
 
-      <div className="app-main-col">
-        <TopHeader
-          activePage={activePage}
-          onNavigate={handleNavigate}
-          onToggleMobileMenu={() => setMobileMenuOpen((v) => !v)}
-          shop={dashboard?.meta?.shop || meta?.shop}
-          pendingRewards={pendingRewards}
-          onOpenRecognize={() => {
-            setRecognizeEmpId(null);
-            setRecognizeModalOpen(true);
-          }}
-          onSelectInsightsTab={() => {
-            setAiTab('insights');
-            setAiOpen(true);
-          }}
-        />
-
-        <main className="page-container">
+      <main className="page-container">
           {apiError && (
             <div
               className="card"
@@ -213,8 +198,7 @@ export default function App() {
               showToast={showToast}
             />
           )}
-        </main>
-      </div>
+      </main>
 
       <EmployeesModal
         isOpen={employeesModalOpen}

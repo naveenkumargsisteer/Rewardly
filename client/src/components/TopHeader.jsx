@@ -1,31 +1,70 @@
-import React, { useState } from 'react';
-import { Award, Bell, Menu } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Award, Bell, ChevronDown, LayoutDashboard, Settings, Sparkles, Store,
+} from 'lucide-react';
+
+function getOwnerInitials(name) {
+  const parts = String(name || 'Rajeshwari Deshpande')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return 'RD';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
 
 export default function TopHeader({
   activePage,
   onNavigate,
-  onToggleMobileMenu,
   shop,
+  employeeCount,
   pendingRewards,
   onOpenRecognize,
   onSelectInsightsTab,
 }) {
   const [showNotifs, setShowNotifs] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const notifRef = useRef(null);
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    function handleOutsideClick(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setShowNotifs(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setShowProfileMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  const ownerName = shop?.owner_name || 'Rajeshwari Deshpande';
+  const ownerInitials = getOwnerInitials(ownerName);
+
+  function goToPage(page) {
+    setShowProfileMenu(false);
+    setShowNotifs(false);
+    onNavigate(page);
+  }
 
   return (
     <header className="top-header">
       <div className="brand-group">
         <button
           type="button"
-          className="icon-btn mobile-menu-btn"
-          onClick={onToggleMobileMenu}
-          aria-label="Open menu"
+          className="brand-logo"
+          onClick={() => goToPage('dashboard')}
+          title="Rewardly Dashboard"
+          aria-label="Go to Dashboard"
+          style={{ border: 'none', cursor: 'pointer', flexShrink: 0 }}
         >
-          <Menu size={18} />
+          <Sparkles size={19} />
         </button>
         <div>
           <h1 className="brand-title">
-            {activePage === 'settings' ? 'Settings & API Exposure' : 'Performance & Loyalty Dashboard'}
+            {activePage === 'settings' ? 'Settings' : 'Performance & Loyalty Dashboard'}
             <span className="brand-badge">{shop?.name || 'Kaveri Silks & Textiles'}</span>
           </h1>
           <p className="brand-subtitle">
@@ -40,12 +79,15 @@ export default function TopHeader({
           Give Recognition
         </button>
 
-        <div style={{ position: 'relative' }}>
+        <div ref={notifRef} style={{ position: 'relative' }}>
           <button
             type="button"
             className="icon-btn"
             aria-label="Notifications"
-            onClick={() => setShowNotifs((v) => !v)}
+            onClick={() => {
+              setShowNotifs((v) => !v);
+              setShowProfileMenu(false);
+            }}
           >
             <Bell size={17} />
             {pendingRewards.length > 0 && (
@@ -109,12 +151,84 @@ export default function TopHeader({
           )}
         </div>
 
-        <div className="owner-chip">
-          <span className="avatar" style={{ background: '#6d28d9' }}>RD</span>
-          <div>
-            <div className="owner-name">{shop?.owner_name || 'Rajeshwari Deshpande'}</div>
-            <div className="owner-role">Showroom Owner</div>
-          </div>
+        <div ref={profileRef} style={{ position: 'relative' }}>
+          <button
+            type="button"
+            className={`owner-chip ${showProfileMenu ? 'open' : ''}`}
+            onClick={() => {
+              setShowProfileMenu((v) => !v);
+              setShowNotifs(false);
+            }}
+            aria-expanded={showProfileMenu}
+            aria-haspopup="menu"
+          >
+            <span className="avatar" style={{ background: '#6d28d9' }}>{ownerInitials}</span>
+            <div style={{ textAlign: 'left' }}>
+              <div className="owner-name">{ownerName}</div>
+              <div className="owner-role">Showroom Owner</div>
+            </div>
+            <ChevronDown
+              size={14}
+              color="#646b82"
+              style={{
+                marginLeft: 2,
+                transition: 'transform 0.16s ease',
+                transform: showProfileMenu ? 'rotate(180deg)' : 'rotate(0deg)',
+              }}
+            />
+          </button>
+
+          {showProfileMenu && (
+            <div className="card profile-dropdown" role="menu">
+              <div className="profile-dropdown-head">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="avatar" style={{ background: '#6d28d9', width: 36, height: 36 }}>
+                    {ownerInitials}
+                  </span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {ownerName}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                      Showroom Owner
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 11.5, color: 'var(--text-muted)' }}>
+                  <Store size={13} color="var(--primary)" />
+                  <span>{employeeCount ?? 30} Staff • 4-Month Window</span>
+                </div>
+              </div>
+
+              <div className="profile-dropdown-items">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={`profile-menu-item ${activePage === 'dashboard' ? 'active' : ''}`}
+                  onClick={() => goToPage('dashboard')}
+                >
+                  <LayoutDashboard size={16} />
+                  <div>
+                    <div className="profile-item-title">Dashboard</div>
+                    <div className="profile-item-sub">Static &amp; Custom AI Views</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={`profile-menu-item ${activePage === 'settings' ? 'active' : ''}`}
+                  onClick={() => goToPage('settings')}
+                >
+                  <Settings size={16} />
+                  <div>
+                    <div className="profile-item-title">Settings</div>
+                    <div className="profile-item-sub">Weights, Showroom, Staff &amp; Depts</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>
