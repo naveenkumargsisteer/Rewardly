@@ -1,0 +1,25 @@
+{
+  "name": "rewardly",
+  "version": "1.0.0",
+  "description": "Rewardly - AI-Powered Employee Performance, Loyalty & Reward Recognition System for Textile Showrooms",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node scripts/init-local-db.js",
+    "seed:supabase": "node scripts/seed-supabase.js",
+    "build": "npm --prefix client run build",
+    "dev:client": "npm --prefix client run dev",
+    "setup": "npm install && npm --prefix client install && npm run seed && npm run build"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
+
