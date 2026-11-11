@@ -12,3 +12,4 @@ if (!fs.existsSync(viteBin)) {
 
 console.log('[Rewardly Build] Building React frontend...');
 execSync('npm --prefix client run build', { cwd: rootDir, stdio: 'inherit' });
+
