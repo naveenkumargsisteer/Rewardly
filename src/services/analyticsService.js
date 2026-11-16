@@ -15,6 +15,29 @@ function shiftDate(dateStr, deltaDays) {
   return d.toISOString().slice(0, 10);
 }
 
+function computePercentagesSum100(counts) {
+  const total = counts.reduce((sum, c) => sum + (Number(c) || 0), 0);
+  if (total <= 0) return counts.map(() => 0);
+
+  const exacts = counts.map((c) => (Math.max(0, Number(c) || 0) / total) * 100);
+  const floors = exacts.map((e) => Math.floor(e));
+  const remainderNeeded = 100 - floors.reduce((a, b) => a + b, 0);
+
+  const remainders = exacts.map((e, idx) => ({
+    idx,
+    rem: e - floors[idx],
+    count: counts[idx],
+  }));
+
+  remainders.sort((a, b) => b.rem - a.rem || b.count - a.count || a.idx - b.idx);
+
+  const result = [...floors];
+  for (let i = 0; i < remainderNeeded && i < remainders.length; i++) {
+    result[remainders[i].idx] += 1;
+  }
+  return result;
+}
+
 function buildMonthBuckets(startDate, endDate) {
   const buckets = [];
   let [y, m] = startDate.slice(0, 7).split('-').map(Number);
@@ -263,19 +286,19 @@ async function getDashboardAnalytics({ startDate, endDate, departmentCode = 'all
     recCountsByType[r.recognition_type] = (recCountsByType[r.recognition_type] || 0) + 1;
     recPointsByType[r.recognition_type] = (recPointsByType[r.recognition_type] || 0) + Number(r.points || 0);
   }
-  const totalRecsCount = Math.max(1, activeRecs.length);
+  const types = Object.keys(recTypeColors);
+  const counts = types.map((type) => recCountsByType[type] || 0);
+  const percentages = computePercentagesSum100(counts);
+
   const recognitionByType = {
     total: activeRecs.length,
-    items: Object.keys(recTypeColors).map((type) => {
-      const count = recCountsByType[type] || 0;
-      return {
-        type,
-        count,
-        points: recPointsByType[type] || 0,
-        percentage: Math.round((count / totalRecsCount) * 100),
-        color: recTypeColors[type],
-      };
-    }),
+    items: types.map((type, idx) => ({
+      type,
+      count: counts[idx],
+      points: recPointsByType[type] || 0,
+      percentage: percentages[idx],
+      color: recTypeColors[type],
+    })),
   };
 
   // Automated AI Insights

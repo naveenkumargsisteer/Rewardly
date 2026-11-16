@@ -1,10 +1,43 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Doughnut } from 'react-chartjs-2';
 import { Award } from 'lucide-react';
 import './chartSetup';
 
+function computePercentagesSum100(counts) {
+  const total = counts.reduce((sum, c) => sum + (Number(c) || 0), 0);
+  if (total <= 0) return counts.map(() => 0);
+
+  const exacts = counts.map((c) => (Math.max(0, Number(c) || 0) / total) * 100);
+  const floors = exacts.map((e) => Math.floor(e));
+  const remainderNeeded = 100 - floors.reduce((a, b) => a + b, 0);
+
+  const remainders = exacts.map((e, idx) => ({
+    idx,
+    rem: e - floors[idx],
+    count: counts[idx],
+  }));
+
+  remainders.sort((a, b) => b.rem - a.rem || b.count - a.count || a.idx - b.idx);
+
+  const result = [...floors];
+  for (let i = 0; i < remainderNeeded && i < remainders.length; i++) {
+    result[remainders[i].idx] += 1;
+  }
+  return result;
+}
+
 export default function RecognitionDonutCard({ recognitionByType }) {
-  const items = recognitionByType?.items || [];
+  const rawItems = recognitionByType?.items || [];
+  const items = useMemo(() => {
+    if (!rawItems.length) return [];
+    const counts = rawItems.map((i) => Number(i.count) || 0);
+    const percentages = computePercentagesSum100(counts);
+    return rawItems.map((item, idx) => ({
+      ...item,
+      percentage: percentages[idx],
+    }));
+  }, [rawItems]);
+
   const lead = [...items].sort((a, b) => b.percentage - a.percentage)[0];
 
   const data = {
