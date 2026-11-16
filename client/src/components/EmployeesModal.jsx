@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { X, Search, ArrowLeft, Award, Calculator } from 'lucide-react';
 import './chartSetup';
-import { api, formatCompactInr, formatInr } from '../api/client';
+import { api, formatCompactInr, formatInr, formatDate } from '../api/client';
 import RewardlyLoader from './RewardlyLoader';
 
 export default function EmployeesModal({
@@ -78,7 +78,7 @@ export default function EmployeesModal({
                   : `Showroom Employee Leaderboard (${employees?.length || 0} Employees)`}
               </strong>
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                Filtered Window: {startDate} to {endDate}
+                Filtered Window: {formatDate(startDate)} to {formatDate(endDate)}
               </div>
             </div>
           </div>
@@ -214,7 +214,7 @@ export default function EmployeesModal({
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
                             <span>{fb.customer_name}</span>
-                            <span>{fb.rating}★ • {fb.feedback_date}</span>
+                            <span>{fb.rating}★ • {formatDate(fb.feedback_date)}</span>
                           </div>
                           <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>{fb.comment}</div>
                         </div>
@@ -242,7 +242,7 @@ export default function EmployeesModal({
                       <tbody>
                         {detail.recentSales.slice(0, 6).map((s) => (
                           <tr key={s.id} style={{ cursor: 'default' }}>
-                            <td>{s.sale_date}</td>
+                            <td>{formatDate(s.sale_date)}</td>
                             <td>{s.category}</td>
                             <td>{s.bills_count}</td>
                             <td>{s.items_sold}</td>
@@ -275,7 +275,7 @@ export default function EmployeesModal({
                   value={deptFilter}
                   onChange={(e) => setDeptFilter(e.target.value)}
                 >
-                  <option value="all">All Departments (30)</option>
+                  <option value="all">All Departments ({departments?.length || 0})</option>
                   {(departments || []).map((d) => (
                     <option key={d.id} value={d.code}>{d.name}</option>
                   ))}

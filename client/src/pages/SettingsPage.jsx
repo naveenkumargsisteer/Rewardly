@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft, Sliders, Store, Building2, Users, Plus, UserPlus, Pencil, Trash2, Search, X, AlertTriangle,
 } from 'lucide-react';
-import { api, formatInr } from '../api/client';
+import { api, formatInr, formatDate } from '../api/client';
 import DepartmentModal from '../components/DepartmentModal';
 import EmployeeFormModal from '../components/EmployeeFormModal';
 import RewardlyLoader from '../components/RewardlyLoader';
@@ -458,7 +458,7 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
             value={empDeptFilter}
             onChange={(e) => setEmpDeptFilter(e.target.value)}
           >
-            <option value="all">All Departments</option>
+            <option value="all">All Departments ({departments.length})</option>
             {departments.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
@@ -535,7 +535,7 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
                   <td>
                     <div className="tabular-nums" style={{ fontWeight: 600 }}>{formatInr(emp.base_salary_inr)}</div>
                     <div className="tabular-nums" style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                      {String(emp.join_date || '').slice(0, 10)}
+                      {formatDate(emp.join_date)}
                     </div>
                   </td>
                   <td>

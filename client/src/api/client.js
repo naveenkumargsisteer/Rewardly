@@ -89,3 +89,14 @@ export function formatCompactInr(amount) {
   return `₹${Math.round(n).toLocaleString('en-IN')}`;
 }
 
+export function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const str = String(dateStr).trim().slice(0, 10);
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const [, y, m, d] = match;
+    return `${d}-${m}-${y}`;
+  }
+  return str;
+}
+

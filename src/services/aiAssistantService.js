@@ -8,6 +8,16 @@ function formatInr(amount) {
   return `₹${num.toLocaleString('en-IN')}`;
 }
 
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const match = String(dateStr).trim().slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const [, y, m, d] = match;
+    return `${d}-${m}-${y}`;
+  }
+  return String(dateStr);
+}
+
 async function tryExternalLlmSummary({ question, groundTruthSummary }) {
   const cfg = getConfig();
   if (!cfg.geminiApiKey && !cfg.openaiApiKey) return null;
@@ -100,7 +110,7 @@ async function answerQuestion({ question, startDate, endDate, departmentCode = '
 
   if (matchedEmployees.length >= 2) {
     const picked = matchedEmployees.slice(0, 4);
-    answer = `Here is a side-by-side comparison for ${picked.map((e) => e.full_name).join(' vs ')} (${meta.activeRange.startDate} to ${meta.activeRange.endDate}):`;
+    answer = `Here is a side-by-side comparison for ${picked.map((e) => e.full_name).join(' vs ')} (${formatDate(meta.activeRange.startDate)} to ${formatDate(meta.activeRange.endDate)}):`;
     highlights = picked.map((e) =>
       `#${e.rank} ${e.full_name} (${e.department_name}): ${e.scores.compositeScore}% score • ${formatInr(e.metrics.netSalesInr)} sales • ${e.scores.attendanceScore}% attendance • ${e.metrics.avgRating}★`
     );
@@ -142,7 +152,7 @@ async function answerQuestion({ question, startDate, endDate, departmentCode = '
   ) {
     const sortedDepts = [...departmentBreakdown].sort((a, b) => b.avgPerformanceScore - a.avgPerformanceScore);
     const leader = sortedDepts[0];
-    answer = `Across all ${departmentBreakdown.length} showroom departments (${meta.activeRange.startDate} to ${meta.activeRange.endDate}), ${leader.name} leads with ${leader.avgPerformanceScore}% performance and ${leader.loyaltyScore}% loyalty.`;
+    answer = `Across all ${departmentBreakdown.length} showroom departments (${formatDate(meta.activeRange.startDate)} to ${formatDate(meta.activeRange.endDate)}), ${leader.name} leads with ${leader.avgPerformanceScore}% performance and ${leader.loyaltyScore}% loyalty.`;
     highlights = sortedDepts.map((d) =>
       `${d.name}: ${d.avgPerformanceScore}% perf • ${d.loyaltyScore}% loyalty • ${formatInr(d.netSalesInr)} sales (${d.recognitionCount} recognitions)`
     );
@@ -265,7 +275,7 @@ async function answerQuestion({ question, startDate, endDate, departmentCode = '
   } else {
     // Default / Top performers / Top 10 recognized employees
     const top10 = employeesRanked.slice(0, 10);
-    answer = `Here are the top ${top10.length} employees at ${meta.shop.name} (${meta.activeRange.startDate} to ${meta.activeRange.endDate}), led by ${top10[0]?.full_name} at ${top10[0]?.scores.compositeScore}% composite score and ${formatInr(top10[0]?.metrics.netSalesInr)} net sales.`;
+    answer = `Here are the top ${top10.length} employees at ${meta.shop.name} (${formatDate(meta.activeRange.startDate)} to ${formatDate(meta.activeRange.endDate)}), led by ${top10[0]?.full_name} at ${top10[0]?.scores.compositeScore}% composite score and ${formatInr(top10[0]?.metrics.netSalesInr)} net sales.`;
     highlights = top10.slice(0, 5).map((e) =>
       `#${e.rank} ${e.full_name} (${e.department_name}): ${e.scores.compositeScore}% • ${formatInr(e.metrics.netSalesInr)} • ${e.metrics.recognitionCount} recognitions`
     );

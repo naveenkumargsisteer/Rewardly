@@ -8,6 +8,7 @@ import TopEmployeesCard from '../components/TopEmployeesCard';
 import CustomDashboardWorkspace, { DEFAULT_CUSTOM_WIDGETS } from '../components/CustomDashboardWorkspace';
 import AiAssistantPanel from '../components/AiAssistantPanel';
 import RewardlyLoader from '../components/RewardlyLoader';
+import { formatDate } from '../api/client';
 
 const STORAGE_KEY = 'rewardly_custom_widgets_v1';
 
@@ -96,7 +97,7 @@ export default function DashboardPage({
                 <h2 className="section-title">Employee Overview</h2>
                 <p className="section-sub">
                   {dashboard?.meta?.shop?.name || 'Kaveri Silks & Textiles'} •{' '}
-                  {dashboard?.meta?.activeRange?.days || 123} days ({startDate} to {endDate})
+                  {dashboard?.meta?.activeRange?.days || 123} days ({formatDate(startDate)} to {formatDate(endDate)})
                 </p>
               </div>
             </div>
@@ -182,7 +183,7 @@ export default function DashboardPage({
                 value={department}
                 onChange={(e) => onChangeDepartment(e.target.value)}
               >
-                <option value="all">All Departments (6)</option>
+                <option value="all">All Departments ({departments?.length || 0})</option>
                 {(departments || []).map((d) => (
                   <option key={d.id} value={d.code}>{d.name}</option>
                 ))}
