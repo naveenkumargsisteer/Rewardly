@@ -99,7 +99,7 @@ export default function EmployeeFormModal({
         errorCorrectionLevel: 'M',
         color: { dark: '#1e1b4b', light: '#ffffff' },
       },
-      () => {}
+      () => { }
     );
   }, [isOpen, feedbackUrl, viewMode]);
 
