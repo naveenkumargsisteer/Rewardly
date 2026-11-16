@@ -1705,6 +1705,77 @@ button, input, select, textarea {
   flex-wrap: wrap;
 }
 
+/* Employee Details Readonly View */
+.emp-profile-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(245, 243, 255, 0.8), rgba(238, 242, 255, 0.7));
+  border: 1px solid #e4dbff;
+  margin-bottom: 14px;
+}
+
+.emp-profile-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.emp-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.emp-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.emp-detail-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.emp-detail-value {
+  font-size: 13.5px;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.emp-qr-only-box {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid #ddd6fe;
+  background: linear-gradient(135deg, rgba(245, 243, 255, 0.72), rgba(238, 242, 255, 0.65));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.clickable-row:hover {
+  background: #f5f3ff !important;
+}
+
 .qr-canvas-wrap {
   width: 152px;
   height: 152px;

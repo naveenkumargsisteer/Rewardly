@@ -36,6 +36,7 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
   const [deptModalOpen, setDeptModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState(null);
   const [empModalOpen, setEmpModalOpen] = useState(false);
+  const [empModalMode, setEmpModalMode] = useState('details'); // 'details' | 'edit'
   const [editingEmp, setEditingEmp] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -430,7 +431,7 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
               type="button"
               className="btn btn-primary"
               disabled={departments.length === 0}
-              onClick={() => { setEditingEmp(null); setEmpModalOpen(true); }}
+              onClick={() => { setEditingEmp(null); setEmpModalMode('edit'); setEmpModalOpen(true); }}
             >
               <UserPlus size={15} /> Add Employee
             </button>
@@ -496,7 +497,12 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
                   </td>
                 </tr>
               ) : filteredEmployees.map((emp) => (
-                <tr key={emp.id} style={{ cursor: 'default' }}>
+                <tr
+                  key={emp.id}
+                  className="clickable-row"
+                  onClick={() => { setEditingEmp(emp); setEmpModalMode('details'); setEmpModalOpen(true); }}
+                  title="Click to view employee details"
+                >
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div
@@ -548,14 +554,23 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
                       <button
                         type="button"
                         className="btn btn-sm"
-                        onClick={() => { setEditingEmp(emp); setEmpModalOpen(true); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingEmp(emp);
+                          setEmpModalMode('edit');
+                          setEmpModalOpen(true);
+                        }}
                       >
                         <Pencil size={13} /> Edit
                       </button>
                       <button
                         type="button"
                         className="btn btn-sm btn-danger"
-                        onClick={() => { setDeleteError(''); setDeleteTarget({ type: 'employee', item: emp }); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteError('');
+                          setDeleteTarget({ type: 'employee', item: emp });
+                        }}
                       >
                         <Trash2 size={13} /> Delete
                       </button>
@@ -580,8 +595,17 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
         initialEmployee={editingEmp}
         departments={departments}
         suggestedCode={getNextEmpCode(employees)}
+        mode={empModalMode}
         onClose={() => setEmpModalOpen(false)}
-        onSaved={handleEmployeeSaved}
+        onSaved={(saved, isEdit) => {
+          handleEmployeeSaved(saved, isEdit);
+          setEditingEmp(saved);
+        }}
+        onDelete={(emp) => {
+          setEmpModalOpen(false);
+          setDeleteError('');
+          setDeleteTarget({ type: 'employee', item: emp });
+        }}
       />
 
       {deleteTarget && (
