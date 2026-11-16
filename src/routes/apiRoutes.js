@@ -145,6 +145,58 @@ router.delete('/employees/:id', async (req, res, next) => {
   }
 });
 
+router.put('/employees/:id/avatar', async (req, res, next) => {
+  try {
+    const { avatar_url } = req.body || {};
+    const repo = getRepository();
+    const updated = await repo.updateEmployeeAvatar(req.params.id, avatar_url);
+    res.json({ success: true, employee: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Employee Auth Routes (Username is Employee ID only)
+router.post('/auth/employee-login', async (req, res, next) => {
+  try {
+    const { emp_code, password } = req.body || {};
+    if (!emp_code || !password) {
+      return res.status(400).json({ error: 'Employee ID and password are required.' });
+    }
+    const repo = getRepository();
+    const result = await repo.authenticateEmployee(emp_code, password);
+    res.json({
+      success: true,
+      token: result.token,
+      employee: result.employee,
+      isDefaultPassword: Boolean(result.isDefaultPassword),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/auth/employee-reset-password', async (req, res, next) => {
+  try {
+    const { emp_code, verification, new_password } = req.body || {};
+    if (!emp_code || !verification || !new_password) {
+      return res.status(400).json({ error: 'Employee ID, verification details (email or phone), and new password are required.' });
+    }
+    if (String(new_password).length < 4) {
+      return res.status(400).json({ error: 'New password must be at least 4 characters.' });
+    }
+    const repo = getRepository();
+    const result = await repo.resetEmployeePassword(emp_code, verification, new_password);
+    res.json({
+      success: true,
+      message: 'Password reset successfully.',
+      employee: result.employee,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/departments', async (req, res, next) => {
   try {
     const repo = getRepository();

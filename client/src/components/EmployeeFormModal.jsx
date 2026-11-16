@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { api, formatDate, formatInr } from '../api/client';
+import EmployeeAvatar from './EmployeeAvatar';
 
 const SHIFT_PRESETS = [
   'Morning (10:00-19:30)',
@@ -288,18 +289,15 @@ export default function EmployeeFormModal({
             {/* Profile banner */}
             <div className="emp-profile-banner">
               <div className="emp-profile-left">
-                <div
-                  className="avatar"
-                  style={{
-                    background: form.avatar_color || '#7C3AED',
-                    width: 44,
-                    height: 44,
-                    fontSize: 16,
-                    fontWeight: 700,
+                <EmployeeAvatar
+                  employee={{
+                    avatar_url: initialEmployee?.avatar_url,
+                    avatar_color: form.avatar_color,
+                    avatar_initials: initialEmployee?.avatar_initials,
+                    full_name: form.full_name,
                   }}
-                >
-                  {initialEmployee?.avatar_initials || form.full_name.slice(0, 2).toUpperCase()}
-                </div>
+                  size={46}
+                />
                 <div>
                   <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)' }}>
                     {form.full_name}

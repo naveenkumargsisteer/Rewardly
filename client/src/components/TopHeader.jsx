@@ -1,7 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Award, Bell, ChevronDown, Settings,
+  Award,
+  Bell,
+  ChevronDown,
+  LayoutDashboard,
+  LogOut,
+  QrCode,
+  Settings,
+  User,
+  UserCheck,
 } from 'lucide-react';
+import EmployeeAvatar from './EmployeeAvatar';
 
 function getOwnerInitials(name) {
   const parts = String(name || 'Rajeshwari Deshpande')
@@ -21,6 +30,9 @@ export default function TopHeader({
   pendingRewards,
   onOpenRecognize,
   onSelectInsightsTab,
+  loggedInEmployee,
+  onOpenEmployeeLogin,
+  onEmployeeLogout,
 }) {
   const [showNotifs, setShowNotifs] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -49,6 +61,13 @@ export default function TopHeader({
     onNavigate(page);
   }
 
+  const headerTitle =
+    activePage === 'settings'
+      ? 'Rewardly Settings'
+      : activePage === 'employee-portal'
+        ? `Employee Portal — ${loggedInEmployee?.full_name || 'Staff'}`
+        : 'Rewardly Performance & Loyalty';
+
   return (
     <header className="top-header">
       <div className="brand-group">
@@ -63,7 +82,7 @@ export default function TopHeader({
         </button>
         <div>
           <h1 className="brand-title">
-            {activePage === 'settings' ? 'Rewardly Settings' : 'Rewardly Performance & Loyalty'}
+            {headerTitle}
             <span className="brand-badge">{shop?.name || 'Kaveri Silks & Textiles'}</span>
           </h1>
           <p className="brand-subtitle">
@@ -73,10 +92,41 @@ export default function TopHeader({
       </div>
 
       <div className="header-actions">
-        <button type="button" className="btn btn-primary btn-sm" onClick={onOpenRecognize}>
-          <Award size={14} />
-          Give Recognition
-        </button>
+        {/* Employee Portal / Staff Pill */}
+        {loggedInEmployee ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              type="button"
+              className={`btn btn-sm ${activePage === 'employee-portal' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => goToPage('employee-portal')}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px' }}
+              title="Open My Staff Portal"
+            >
+              <EmployeeAvatar employee={loggedInEmployee} size={22} />
+              <span>
+                <strong>{loggedInEmployee.full_name?.split(' ')[0]}</strong> ({loggedInEmployee.emp_code})
+              </span>
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={onOpenEmployeeLogin}
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            title="Sign in with Employee ID"
+          >
+            <User size={14} />
+            <span>Employee Login</span>
+          </button>
+        )}
+
+        {activePage !== 'employee-portal' && (
+          <button type="button" className="btn btn-primary btn-sm" onClick={onOpenRecognize}>
+            <Award size={14} />
+            Give Recognition
+          </button>
+        )}
 
         <div ref={notifRef} style={{ position: 'relative' }}>
           <button
@@ -203,6 +253,19 @@ export default function TopHeader({
                 <button
                   type="button"
                   role="menuitem"
+                  className={`profile-menu-item ${activePage === 'dashboard' ? 'active' : ''}`}
+                  onClick={() => goToPage('dashboard')}
+                >
+                  <LayoutDashboard size={16} />
+                  <div>
+                    <div className="profile-item-title">Dashboard</div>
+                    <div className="profile-item-sub">Static &amp; Custom AI Views</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
                   className={`profile-menu-item ${activePage === 'settings' ? 'active' : ''}`}
                   onClick={() => goToPage('settings')}
                 >
@@ -212,6 +275,55 @@ export default function TopHeader({
                     <div className="profile-item-sub">Weights, Showroom, Staff &amp; Depts</div>
                   </div>
                 </button>
+
+                {loggedInEmployee ? (
+                  <>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={`profile-menu-item ${activePage === 'employee-portal' ? 'active' : ''}`}
+                      onClick={() => goToPage('employee-portal')}
+                    >
+                      <UserCheck size={16} />
+                      <div>
+                        <div className="profile-item-title">My Employee Portal</div>
+                        <div className="profile-item-sub">Logged in as {loggedInEmployee.emp_code}</div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="profile-menu-item"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        onEmployeeLogout?.();
+                      }}
+                      style={{ color: '#dc2626' }}
+                    >
+                      <LogOut size={16} />
+                      <div>
+                        <div className="profile-item-title" style={{ color: '#dc2626' }}>Employee Sign Out</div>
+                        <div className="profile-item-sub">Log out of staff session</div>
+                      </div>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="profile-menu-item"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      onOpenEmployeeLogin();
+                    }}
+                  >
+                    <User size={16} />
+                    <div>
+                      <div className="profile-item-title">Employee Login</div>
+                      <div className="profile-item-sub">Access Staff Portal &amp; Counter QR</div>
+                    </div>
+                  </button>
+                )}
               </div>
             </div>
           )}

@@ -159,6 +159,7 @@ function scoreEmployees({
       base_salary_inr: Number(emp.base_salary_inr),
       avatar_initials: emp.avatar_initials,
       avatar_color: emp.avatar_color,
+      avatar_url: emp.avatar_url || (emp.avatar_color?.startsWith('data:image') ? emp.avatar_color : null),
       department_id: emp.department_id,
       department_code: emp.department_code,
       department_name: emp.department_name,

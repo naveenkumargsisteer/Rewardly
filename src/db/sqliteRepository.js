@@ -8,6 +8,11 @@ const {
   sanitizeEmployeePayload,
   sanitizePublicFeedbackPayload,
 } = require('../utils/crudValidation');
+const {
+  hashPassword,
+  parsePhoneAndAuth,
+  packPhoneAndAuth,
+} = require('../utils/authUtils');
 
 class SqliteRepository {
   constructor() {
@@ -59,13 +64,26 @@ class SqliteRepository {
     return this.db.prepare('SELECT * FROM departments ORDER BY target_monthly_sales DESC').all();
   }
 
+  _formatEmployee(row) {
+    if (!row) return null;
+    const { phone } = parsePhoneAndAuth(row.phone);
+    const isPhoto = typeof row.avatar_color === 'string' && row.avatar_color.startsWith('data:image');
+    return {
+      ...row,
+      phone,
+      avatar_url: isPhoto ? row.avatar_color : null,
+      avatar_color: isPhoto ? (row.department_color || '#7C3AED') : row.avatar_color,
+    };
+  }
+
   _getEmployeeById(id) {
-    return this.db.prepare(`
+    const raw = this.db.prepare(`
       SELECT e.*, d.code AS department_code, d.name AS department_name, d.color_hex AS department_color, d.target_monthly_sales
       FROM employees e
       JOIN departments d ON d.id = e.department_id
       WHERE e.id = ?
     `).get(id);
+    return this._formatEmployee(raw);
   }
 
   _requireDepartment(departmentId) {
@@ -75,12 +93,13 @@ class SqliteRepository {
   }
 
   async getEmployees() {
-    return this.db.prepare(`
+    const rows = this.db.prepare(`
       SELECT e.*, d.code AS department_code, d.name AS department_name, d.color_hex AS department_color, d.target_monthly_sales
       FROM employees e
       JOIN departments d ON d.id = e.department_id
       ORDER BY e.emp_code ASC
     `).all();
+    return rows.map((r) => this._formatEmployee(r));
   }
 
   async createDepartment(payload) {
@@ -479,6 +498,107 @@ class SqliteRepository {
       department_name: target.employee.department_name,
       shop_name: target.shop.name,
     };
+  }
+
+  async authenticateEmployee(empCode, password) {
+    const code = String(empCode || '').trim().toUpperCase();
+    const pwd = String(password || '').trim();
+    if (!code || !pwd) {
+      throw httpError(400, 'Employee ID and password are required.');
+    }
+
+    const row = this.db.prepare(`
+      SELECT e.*, d.code AS department_code, d.name AS department_name, d.color_hex AS department_color, d.target_monthly_sales
+      FROM employees e
+      JOIN departments d ON d.id = e.department_id
+      WHERE LOWER(e.emp_code) = LOWER(?)
+      LIMIT 1
+    `).get(code);
+
+    if (!row) {
+      throw httpError(404, `Employee ID "${code}" not found. Please verify your Employee Code.`);
+    }
+
+    const { passwordHash } = parsePhoneAndAuth(row.phone);
+    let valid = false;
+    if (passwordHash) {
+      valid = hashPassword(pwd) === passwordHash;
+    } else {
+      valid = pwd.toUpperCase() === row.emp_code.toUpperCase() || pwd === 'Rewardly@123';
+    }
+
+    if (!valid) {
+      throw httpError(401, 'Invalid password. If you forgot your password, please use "Forgot Password".');
+    }
+
+    return {
+      token: `rw_emp_${row.id}_${Date.now()}`,
+      employee: this._formatEmployee(row),
+      isDefaultPassword: !passwordHash,
+    };
+  }
+
+  async resetEmployeePassword(empCode, verification, newPassword) {
+    const code = String(empCode || '').trim().toUpperCase();
+    const v = String(verification || '').trim().toLowerCase();
+    const pwd = String(newPassword || '').trim();
+
+    if (!code || !v || !pwd) {
+      throw httpError(400, 'Employee ID, verification (email/phone), and new password are required.');
+    }
+    if (pwd.length < 4) {
+      throw httpError(400, 'Password must be at least 4 characters long.');
+    }
+
+    const row = this.db.prepare(`
+      SELECT id, emp_code, full_name, email, phone
+      FROM employees
+      WHERE LOWER(emp_code) = LOWER(?)
+      LIMIT 1
+    `).get(code);
+
+    if (!row) {
+      throw httpError(404, `Employee ID "${code}" not found.`);
+    }
+
+    const { phone: cleanPhone } = parsePhoneAndAuth(row.phone);
+    const empEmail = String(row.email || '').trim().toLowerCase();
+    const empPhoneDigits = cleanPhone.replace(/[^0-9]/g, '');
+    const vDigits = v.replace(/[^0-9]/g, '');
+
+    const emailMatch = v === empEmail;
+    const phoneMatch = Boolean(vDigits && (empPhoneDigits === vDigits || (vDigits.length >= 4 && empPhoneDigits.endsWith(vDigits))));
+
+    if (!emailMatch && !phoneMatch) {
+      throw httpError(400, 'Verification failed. Please enter the registered Email or Phone number on file for this employee.');
+    }
+
+    const newHash = hashPassword(pwd);
+    const packed = packPhoneAndAuth(cleanPhone, newHash);
+
+    this.db.prepare('UPDATE employees SET phone = ? WHERE id = ?').run(packed, row.id);
+
+    return {
+      success: true,
+      message: `Password has been reset successfully for ${row.full_name} (${row.emp_code}). You can now log in.`,
+      employee: this._formatEmployee(this._getEmployeeById(row.id)),
+    };
+  }
+
+  async updateEmployeeAvatar(empId, avatarUrl) {
+    const id = String(empId || '').trim();
+    if (!id) throw httpError(400, 'Employee ID is required.');
+
+    const emp = this._getEmployeeById(id);
+    if (!emp) throw httpError(404, 'Employee not found.');
+
+    const fallbackColor = emp.department_color || '#7C3AED';
+    const nextColorVal = avatarUrl && String(avatarUrl).startsWith('data:image')
+      ? avatarUrl
+      : fallbackColor;
+
+    this.db.prepare('UPDATE employees SET avatar_color = ? WHERE id = ?').run(nextColorVal, id);
+    return this._getEmployeeById(id);
   }
 
   async insertSalesRows(rows) {

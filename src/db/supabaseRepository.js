@@ -7,6 +7,11 @@ const {
   sanitizeEmployeePayload,
   sanitizePublicFeedbackPayload,
 } = require('../utils/crudValidation');
+const {
+  hashPassword,
+  parsePhoneAndAuth,
+  packPhoneAndAuth,
+} = require('../utils/authUtils');
 
 const DEFAULT_SETTINGS = {
   sales_weight: 40,
@@ -137,8 +142,13 @@ class SupabaseRepository {
 
   _formatEmployeeRow(row) {
     const { departments, ...emp } = row;
+    const { phone } = parsePhoneAndAuth(emp.phone);
+    const isPhoto = typeof emp.avatar_color === 'string' && emp.avatar_color.startsWith('data:image');
     return {
       ...emp,
+      phone,
+      avatar_url: isPhoto ? emp.avatar_color : null,
+      avatar_color: isPhoto ? (departments?.color_hex || '#7C3AED') : emp.avatar_color,
       department_code: departments?.code || '',
       department_name: departments?.name || '',
       department_color: departments?.color_hex || '#7C3AED',
@@ -576,6 +586,129 @@ class SupabaseRepository {
       department_name: target.employee.department_name,
       shop_name: target.shop.name,
     };
+  }
+
+  async authenticateEmployee(empCode, password) {
+    await this.ensureSeededIfEmpty();
+    const code = String(empCode || '').trim().toUpperCase();
+    const pwd = String(password || '').trim();
+    if (!code || !pwd) {
+      throw httpError(400, 'Employee ID and password are required.');
+    }
+
+    const { data, error } = await this.supabase
+      .from('employees')
+      .select('*, departments(code, name, color_hex, target_monthly_sales)')
+      .ilike('emp_code', code)
+      .limit(1);
+
+    if (error) throw new Error(`Supabase employee lookup error: ${error.message}`);
+    const emp = data?.[0];
+    if (!emp) {
+      throw httpError(404, `Employee ID "${code}" not found. Please verify your Employee Code.`);
+    }
+
+    const { passwordHash } = parsePhoneAndAuth(emp.phone);
+    let valid = false;
+    if (passwordHash) {
+      valid = hashPassword(pwd) === passwordHash;
+    } else {
+      // Initial default password: emp_code (case-insensitive) or Rewardly@123
+      valid = pwd.toUpperCase() === emp.emp_code.toUpperCase() || pwd === 'Rewardly@123';
+    }
+
+    if (!valid) {
+      throw httpError(401, 'Invalid password. If you forgot your password, please use "Forgot Password".');
+    }
+
+    return {
+      token: `rw_emp_${emp.id}_${Date.now()}`,
+      employee: this._formatEmployeeRow(emp),
+      isDefaultPassword: !passwordHash,
+    };
+  }
+
+  async resetEmployeePassword(empCode, verification, newPassword) {
+    await this.ensureSeededIfEmpty();
+    const code = String(empCode || '').trim().toUpperCase();
+    const v = String(verification || '').trim().toLowerCase();
+    const pwd = String(newPassword || '').trim();
+
+    if (!code || !v || !pwd) {
+      throw httpError(400, 'Employee ID, verification (email/phone), and new password are required.');
+    }
+    if (pwd.length < 4) {
+      throw httpError(400, 'Password must be at least 4 characters long.');
+    }
+
+    const { data, error } = await this.supabase
+      .from('employees')
+      .select('id, emp_code, full_name, email, phone')
+      .ilike('emp_code', code)
+      .limit(1);
+
+    if (error) throw new Error(`Supabase employee lookup error: ${error.message}`);
+    const emp = data?.[0];
+    if (!emp) {
+      throw httpError(404, `Employee ID "${code}" not found.`);
+    }
+
+    const { phone: cleanPhone } = parsePhoneAndAuth(emp.phone);
+    const empEmail = String(emp.email || '').trim().toLowerCase();
+    const empPhoneDigits = cleanPhone.replace(/[^0-9]/g, '');
+    const vDigits = v.replace(/[^0-9]/g, '');
+
+    const emailMatch = v === empEmail;
+    const phoneMatch = Boolean(vDigits && (empPhoneDigits === vDigits || (vDigits.length >= 4 && empPhoneDigits.endsWith(vDigits))));
+
+    if (!emailMatch && !phoneMatch) {
+      throw httpError(400, 'Verification failed. Please enter the registered Email or Phone number on file for this employee.');
+    }
+
+    const newHash = hashPassword(pwd);
+    const packed = packPhoneAndAuth(cleanPhone, newHash);
+
+    const { error: updateErr } = await this.supabase
+      .from('employees')
+      .update({ phone: packed })
+      .eq('id', emp.id);
+
+    if (updateErr) throw new Error(`Supabase password update error: ${updateErr.message}`);
+
+    return {
+      success: true,
+      message: `Password has been reset successfully for ${emp.full_name} (${emp.emp_code}). You can now log in.`,
+      employee: this._formatEmployeeRow(emp),
+    };
+  }
+
+  async updateEmployeeAvatar(empId, avatarUrl) {
+    await this.ensureSeededIfEmpty();
+    const id = String(empId || '').trim();
+    if (!id) throw httpError(400, 'Employee ID is required.');
+
+    // Fetch employee and department for fallback color
+    const { data: emp, error: empErr } = await this.supabase
+      .from('employees')
+      .select('id, department_id, departments(color_hex)')
+      .eq('id', id)
+      .single();
+    if (empErr || !emp) throw httpError(404, 'Employee not found.');
+
+    const fallbackColor = emp.departments?.color_hex || '#7C3AED';
+    const nextColorVal = avatarUrl && String(avatarUrl).startsWith('data:image')
+      ? avatarUrl
+      : fallbackColor;
+
+    const { data: updated, error } = await this.supabase
+      .from('employees')
+      .update({ avatar_color: nextColorVal })
+      .eq('id', id)
+      .select('*, departments(code, name, color_hex, target_monthly_sales)')
+      .single();
+
+    if (error) throw new Error(`Supabase avatar update error: ${error.message}`);
+    return this._formatEmployeeRow(updated);
   }
 
   async insertSalesRows(rows) {

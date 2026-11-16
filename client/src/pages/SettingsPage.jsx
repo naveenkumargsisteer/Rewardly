@@ -5,6 +5,7 @@ import {
 import { api, formatInr, formatDate } from '../api/client';
 import DepartmentModal from '../components/DepartmentModal';
 import EmployeeFormModal from '../components/EmployeeFormModal';
+import EmployeeAvatar from '../components/EmployeeAvatar';
 import RewardlyLoader from '../components/RewardlyLoader';
 
 function getNextEmpCode(employees) {
@@ -491,12 +492,7 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
                 >
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div
-                        className="avatar"
-                        style={{ background: emp.avatar_color || '#7C3AED', width: 34, height: 34, fontSize: 12 }}
-                      >
-                        {emp.avatar_initials}
-                      </div>
+                      <EmployeeAvatar employee={emp} size={34} />
                       <div>
                         <div style={{ fontWeight: 700 }}>{emp.full_name}</div>
                         <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{emp.email}</div>

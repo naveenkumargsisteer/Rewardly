@@ -1,6 +1,7 @@
 import React from 'react';
 import { Trophy, ArrowRight } from 'lucide-react';
 import { formatCompactInr } from '../api/client';
+import EmployeeAvatar from './EmployeeAvatar';
 
 export default function TopEmployeesCard({ employees, onViewAll, onSelectEmployee }) {
   const topFive = (employees || []).slice(0, 5);
@@ -28,12 +29,7 @@ export default function TopEmployeesCard({ employees, onViewAll, onSelectEmploye
             onKeyDown={(e) => { if (e.key === 'Enter') onSelectEmployee(emp.id); }}
           >
             <div className="top-emp-left">
-              <span
-                className="avatar"
-                style={{ background: emp.avatar_color }}
-              >
-                {emp.avatar_initials}
-              </span>
+              <EmployeeAvatar employee={emp} size={32} />
               <div style={{ minWidth: 0 }}>
                 <div className="emp-name">
                   #{emp.rank} {emp.full_name}

@@ -3,6 +3,7 @@ import { Bar } from 'react-chartjs-2';
 import { X, Search, ArrowLeft, Award, Calculator } from 'lucide-react';
 import './chartSetup';
 import { api, formatCompactInr, formatInr, formatDate } from '../api/client';
+import EmployeeAvatar from './EmployeeAvatar';
 import RewardlyLoader from './RewardlyLoader';
 
 export default function EmployeesModal({
@@ -96,12 +97,7 @@ export default function EmployeesModal({
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span
-                      className="avatar"
-                      style={{ width: 48, height: 48, fontSize: 16, background: detail.employee.avatar_color }}
-                    >
-                      {detail.employee.avatar_initials}
-                    </span>
+                    <EmployeeAvatar employee={detail.employee} size={48} />
                     <div>
                       <div style={{ fontSize: 18, fontWeight: 800 }}>
                         #{detail.employee.rank} {detail.employee.full_name}
@@ -304,9 +300,7 @@ export default function EmployeesModal({
                         <td><strong>#{emp.rank}</strong></td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span className="avatar" style={{ background: emp.avatar_color, width: 28, height: 28, fontSize: 11 }}>
-                              {emp.avatar_initials}
-                            </span>
+                            <EmployeeAvatar employee={emp} size={28} />
                             <div>
                               <div style={{ fontWeight: 700 }}>{emp.full_name}</div>
                               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>

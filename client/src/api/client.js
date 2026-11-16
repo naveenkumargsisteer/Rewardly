@@ -76,7 +76,88 @@ export const api = {
     request(`/api/public/feedback-target/${encodeURIComponent(empRef)}`),
   submitPublicFeedback: (payload) =>
     request('/api/public/feedback', { method: 'POST', body: JSON.stringify(payload) }),
+  employeeLogin: ({ emp_code, password }) =>
+    request('/api/auth/employee-login', {
+      method: 'POST',
+      body: JSON.stringify({ emp_code, password }),
+    }),
+  employeeResetPassword: ({ emp_code, verification, new_password }) =>
+    request('/api/auth/employee-reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ emp_code, verification, new_password }),
+    }),
+  updateEmployeeAvatar: (id, avatar_url) =>
+    request(`/api/employees/${encodeURIComponent(id)}/avatar`, {
+      method: 'PUT',
+      body: JSON.stringify({ avatar_url }),
+    }),
 };
+
+/**
+ * Client-side minimal resolution image compressor for avatars.
+ * Centers, crops to a square, resizes to target size (default 160x160),
+ * and compresses to WebP/JPEG.
+ * Keeps payload ~6-12KB for zero storage burden on Supabase & Vercel.
+ */
+export async function compressImageToMinimalResolution(file, { maxSize = 160, quality = 0.8 } = {}) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith('image/')) {
+      return reject(new Error('Please select a valid image file.'));
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = maxSize;
+      canvas.height = maxSize;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        return reject(new Error('Canvas 2D context unavailable'));
+      }
+
+      // Smooth resizing
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // Center square crop
+      const w = img.width;
+      const h = img.height;
+      const cropSize = Math.min(w, h);
+      const srcX = (w - cropSize) / 2;
+      const srcY = (h - cropSize) / 2;
+
+      ctx.drawImage(img, srcX, srcY, cropSize, cropSize, 0, 0, maxSize, maxSize);
+
+      // Prefer image/webp for ultra-low bytes, fallback to image/jpeg
+      let dataUrl = canvas.toDataURL('image/webp', quality);
+      if (!dataUrl.startsWith('data:image/webp')) {
+        dataUrl = canvas.toDataURL('image/jpeg', quality);
+      }
+
+      // Approx size in bytes from base64 length
+      const approxBytes = Math.round((dataUrl.length * 3) / 4);
+
+      resolve({
+        dataUrl,
+        sizeBytes: approxBytes,
+        sizeKb: (approxBytes / 1024).toFixed(1),
+        width: maxSize,
+        height: maxSize,
+      });
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load and process image.'));
+    };
+
+    img.src = objectUrl;
+  });
+}
 
 export function formatInr(amount) {
   return `₹${Math.round(Number(amount || 0)).toLocaleString('en-IN')}`;
