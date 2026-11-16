@@ -234,15 +234,15 @@ export default function EmployeeFormModal({
       <div className="modal-card narrow" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
         {/* Modal Header */}
         <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             {viewMode === 'details' ? (
-              <UserCheck size={18} color="#6d28d9" />
+              <UserCheck size={18} color="#6d28d9" style={{ flexShrink: 0 }} />
             ) : isExisting ? (
-              <Pencil size={18} color="#6d28d9" />
+              <Pencil size={18} color="#6d28d9" style={{ flexShrink: 0 }} />
             ) : (
-              <UserPlus size={18} color="#6d28d9" />
+              <UserPlus size={18} color="#6d28d9" style={{ flexShrink: 0 }} />
             )}
-            <strong style={{ fontSize: 16 }}>
+            <strong style={{ fontSize: 16, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {viewMode === 'details'
                 ? `Employee Details — ${form.full_name} (${form.emp_code})`
                 : isExisting
@@ -250,9 +250,30 @@ export default function EmployeeFormModal({
                   : 'Add New Employee'}
             </strong>
           </div>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close modal">
-            <X size={18} />
-          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            {viewMode === 'details' && isExisting && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  onClick={() => setViewMode('edit')}
+                >
+                  <Pencil size={13} /> Edit
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  onClick={() => onDelete?.(initialEmployee)}
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
+              </>
+            )}
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close modal">
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {errorMsg && (
@@ -384,27 +405,11 @@ export default function EmployeeFormModal({
               </div>
             )}
 
-            {/* Details Footer: Delete on left, Close & Edit on right */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18 }}>
-              <button
-                type="button"
-                className="btn btn-danger btn-sm"
-                onClick={() => onDelete?.(initialEmployee)}
-              >
-                <Trash2 size={13} /> Delete Employee
+            {/* Details Footer: Close */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 18 }}>
+              <button type="button" className="btn btn-sm" onClick={onClose}>
+                Close
               </button>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button type="button" className="btn btn-sm" onClick={onClose}>
-                  Close
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setViewMode('edit')}
-                >
-                  <Pencil size={13} /> Edit Employee
-                </button>
-              </div>
             </div>
           </div>
         )}

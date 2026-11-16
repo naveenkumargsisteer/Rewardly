@@ -34,6 +34,7 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
 
   // Modals state
   const [deptModalOpen, setDeptModalOpen] = useState(false);
+  const [deptModalMode, setDeptModalMode] = useState('details'); // 'details' | 'edit'
   const [editingDept, setEditingDept] = useState(null);
   const [empModalOpen, setEmpModalOpen] = useState(false);
   const [empModalMode, setEmpModalMode] = useState('details'); // 'details' | 'edit'
@@ -335,7 +336,7 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
             <button
               type="button"
               className="btn btn-primary"
-              onClick={() => { setEditingDept(null); setDeptModalOpen(true); }}
+              onClick={() => { setEditingDept(null); setDeptModalMode('edit'); setDeptModalOpen(true); }}
             >
               <Plus size={15} /> Add Department
             </button>
@@ -350,20 +351,24 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
                 <th>Department Name</th>
                 <th>Monthly Target</th>
                 <th>Assigned Staff</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {departments.length === 0 ? (
                 <tr style={{ cursor: 'default' }}>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>
+                  <td colSpan={4} style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>
                     No departments found. Click &ldquo;Add Department&rdquo; to create one.
                   </td>
                 </tr>
               ) : departments.map((dept) => {
                 const staffCount = deptEmployeeCounts[dept.id] || 0;
                 return (
-                  <tr key={dept.id} style={{ cursor: 'default' }}>
+                  <tr
+                    key={dept.id}
+                    className="clickable-row"
+                    onClick={() => { setEditingDept(dept); setDeptModalMode('details'); setDeptModalOpen(true); }}
+                    title="Click to view department details"
+                  >
                     <td>
                       <span className="brand-badge">{dept.code}</span>
                     </td>
@@ -384,24 +389,6 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
                     <td className="tabular-nums">{formatInr(dept.target_monthly_sales)}</td>
                     <td className="tabular-nums">
                       {staffCount} {staffCount === 1 ? 'employee' : 'employees'}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: 6 }}>
-                        <button
-                          type="button"
-                          className="btn btn-sm"
-                          onClick={() => { setEditingDept(dept); setDeptModalOpen(true); }}
-                        >
-                          <Pencil size={13} /> Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-danger"
-                          onClick={() => { setDeleteError(''); setDeleteTarget({ type: 'department', item: dept }); }}
-                        >
-                          <Trash2 size={13} /> Delete
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 );
@@ -486,13 +473,12 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
                 <th>Role &amp; Shift</th>
                 <th>Salary &amp; Joined</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredEmployees.length === 0 ? (
                 <tr style={{ cursor: 'default' }}>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: 28, color: 'var(--text-muted)' }}>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: 28, color: 'var(--text-muted)' }}>
                     No employees match the current filters.
                   </td>
                 </tr>
@@ -549,33 +535,6 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
                       {emp.status === 'active' ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: 6 }}>
-                      <button
-                        type="button"
-                        className="btn btn-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingEmp(emp);
-                          setEmpModalMode('edit');
-                          setEmpModalOpen(true);
-                        }}
-                      >
-                        <Pencil size={13} /> Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-danger"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteError('');
-                          setDeleteTarget({ type: 'employee', item: emp });
-                        }}
-                      >
-                        <Trash2 size={13} /> Delete
-                      </button>
-                    </div>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -586,8 +545,18 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
       <DepartmentModal
         isOpen={deptModalOpen}
         initialDepartment={editingDept}
+        assignedStaffCount={editingDept ? (deptEmployeeCounts[editingDept.id] || 0) : 0}
+        mode={deptModalMode}
         onClose={() => setDeptModalOpen(false)}
-        onSaved={handleDepartmentSaved}
+        onSaved={(saved, isEdit) => {
+          handleDepartmentSaved(saved, isEdit);
+          setEditingDept(saved);
+        }}
+        onDelete={(dept) => {
+          setDeptModalOpen(false);
+          setDeleteError('');
+          setDeleteTarget({ type: 'department', item: dept });
+        }}
       />
 
       <EmployeeFormModal
