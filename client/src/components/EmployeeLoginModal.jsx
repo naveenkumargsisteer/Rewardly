@@ -386,3 +386,4 @@ export default function EmployeeLoginModal({ isOpen, onClose, onLoginSuccess }) 
     </div>
   );
 }
+
