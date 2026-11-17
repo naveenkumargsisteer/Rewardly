@@ -2,17 +2,11 @@ import React, { useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronRight,
   Eye,
   EyeOff,
-  KeyRound,
   Lock,
   LogIn,
   RotateCcw,
-  Shield,
-  ShieldCheck,
-  Sparkles,
-  Store,
   User,
 } from 'lucide-react';
 import { api, getRoleCategory } from '../api/client';
@@ -33,15 +27,6 @@ export default function LoginPage({ onLoginSuccess }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Quick fill demo test credentials
-  function fillDemoCredentials(code, pwd) {
-    setEmpCode(code);
-    setPassword(pwd);
-    setErrorMsg('');
-    setSuccessMsg('');
-    setMode('login');
-  }
-
   async function handleLogin(e) {
     if (e) e.preventDefault();
     setErrorMsg('');
@@ -60,7 +45,6 @@ export default function LoginPage({ onLoginSuccess }) {
     try {
       const res = await api.employeeLogin({ emp_code: code, password });
       if (res.success && res.employee) {
-        // Compute role category if not present
         const roleCat = res.employee.role_category || getRoleCategory(res.employee.role, res.employee.emp_code);
         const emp = { ...res.employee, role_category: roleCat };
         onLoginSuccess(emp, res.isDefaultPassword);
@@ -119,92 +103,23 @@ export default function LoginPage({ onLoginSuccess }) {
 
   return (
     <div className="login-gateway-shell">
-      <div className="login-gateway-card">
+      <div className="login-gateway-card" style={{ maxWidth: 440 }}>
         {/* Brand Header */}
-        <div className="login-gateway-header">
+        <div className="login-gateway-header" style={{ padding: '32px 32px 24px' }}>
           <div className="login-logo-wrapper">
             <img src="/rewardly-logo.png" alt="Rewardly" className="login-logo-img" />
           </div>
           <h1 className="login-title">Kaveri Silks &amp; Textiles</h1>
           <p className="login-subtitle">
-            Rewardly AI Employee Performance &amp; Retail Showroom Management
+            {mode === 'login'
+              ? 'Sign in with your Employee ID to access your workspace'
+              : 'Verify identity and reset your showroom password'}
           </p>
-
-          <div className="login-role-badge-row">
-            <span className="role-pill admin">👑 Floor Manager / Admin</span>
-            <span className="role-pill cashier">💳 Cashier POS</span>
-            <span className="role-pill staff">🛍️ Staff Portal</span>
-          </div>
-        </div>
-
-        {/* Quick 1-Click Role Testing Bar */}
-        <div className="demo-credentials-bar">
-          <div className="demo-bar-title">
-            <Sparkles size={13} color="#f59e0b" />
-            <span>Click any role to test instantly:</span>
-          </div>
-          <div className="demo-btn-group">
-            <button
-              type="button"
-              className="demo-pill-btn admin"
-              onClick={() => fillDemoCredentials('ADMIN01', 'Admin@123')}
-              title="Test Floor Manager / Admin Interface"
-            >
-              <strong>👑 Admin</strong>
-              <code>ADMIN01</code>
-            </button>
-
-            <button
-              type="button"
-              className="demo-pill-btn cashier"
-              onClick={() => fillDemoCredentials('CASH01', 'Cashier@123')}
-              title="Test Showroom POS & Billing Interface"
-            >
-              <strong>💳 Cashier</strong>
-              <code>CASH01</code>
-            </button>
-
-            <button
-              type="button"
-              className="demo-pill-btn staff"
-              onClick={() => fillDemoCredentials('STAFF01', 'Staff@123')}
-              title="Test Sales Staff Performance & QR Portal"
-            >
-              <strong>🛍️ Staff</strong>
-              <code>STAFF01</code>
-            </button>
-          </div>
-        </div>
-
-        {/* Mode Switcher */}
-        <div className="login-mode-tabs">
-          <button
-            type="button"
-            className={`login-mode-tab ${mode === 'login' ? 'active' : ''}`}
-            onClick={() => {
-              setMode('login');
-              setErrorMsg('');
-              setSuccessMsg('');
-            }}
-          >
-            Showroom Sign In
-          </button>
-          <button
-            type="button"
-            className={`login-mode-tab ${mode === 'reset' ? 'active' : ''}`}
-            onClick={() => {
-              setMode('reset');
-              setErrorMsg('');
-              setSuccessMsg('');
-            }}
-          >
-            Forgot / Reset Password
-          </button>
         </div>
 
         {/* Error / Success Notifications */}
         {errorMsg && (
-          <div className="error-banner" style={{ margin: '0 24px 14px' }}>
+          <div className="error-banner" style={{ margin: '16px 24px 0' }}>
             <AlertCircle size={15} style={{ flexShrink: 0 }} />
             <span>{errorMsg}</span>
           </div>
@@ -214,7 +129,7 @@ export default function LoginPage({ onLoginSuccess }) {
           <div
             className="card"
             style={{
-              margin: '0 24px 14px',
+              margin: '16px 24px 0',
               padding: '10px 14px',
               background: '#ecfdf5',
               borderColor: '#a7f3d0',
@@ -232,8 +147,8 @@ export default function LoginPage({ onLoginSuccess }) {
 
         {/* Form Body */}
         {mode === 'login' ? (
-          <form className="login-gateway-form" onSubmit={handleLogin}>
-            <div className="form-group" style={{ marginBottom: 16 }}>
+          <form className="login-gateway-form" onSubmit={handleLogin} style={{ padding: '24px 28px 32px' }}>
+            <div className="form-group" style={{ marginBottom: 18 }}>
               <label className="field-label" htmlFor="gateway-emp-id">
                 Employee ID (Username)
               </label>
@@ -244,7 +159,7 @@ export default function LoginPage({ onLoginSuccess }) {
                   className="input"
                   value={empCode}
                   onChange={(e) => setEmpCode(e.target.value)}
-                  placeholder="e.g. ADMIN01, CASH01, or STAFF01"
+                  placeholder="e.g. RW002 or ADMIN01"
                   autoFocus
                   required
                   style={{
@@ -261,11 +176,11 @@ export default function LoginPage({ onLoginSuccess }) {
                 />
               </div>
               <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
-                Enter your Employee ID to automatically launch your role workspace.
+                Enter your Employee ID to access your showroom workspace.
               </div>
             </div>
 
-            <div className="form-group" style={{ marginBottom: 22 }}>
+            <div className="form-group" style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <label className="field-label" htmlFor="gateway-pwd">
                   Password
@@ -277,6 +192,7 @@ export default function LoginPage({ onLoginSuccess }) {
                   onClick={() => {
                     setMode('reset');
                     setErrorMsg('');
+                    setSuccessMsg('');
                   }}
                 >
                   Forgot Password?
@@ -289,7 +205,7 @@ export default function LoginPage({ onLoginSuccess }) {
                   className="input"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password"
+                  placeholder="Enter your password"
                   required
                   style={{ paddingLeft: 38 }}
                 />
@@ -323,12 +239,12 @@ export default function LoginPage({ onLoginSuccess }) {
               }}
             >
               <LogIn size={16} />
-              {loading ? 'Authenticating...' : 'Sign In & Launch Workspace'}
+              {loading ? 'Authenticating...' : 'Sign In'}
             </button>
           </form>
         ) : (
           /* Password Reset Mode */
-          <form className="login-gateway-form" onSubmit={handleResetPassword}>
+          <form className="login-gateway-form" onSubmit={handleResetPassword} style={{ padding: '24px 28px 32px' }}>
             <div className="form-group" style={{ marginBottom: 14 }}>
               <label className="field-label" htmlFor="reset-emp-id">
                 Employee ID
@@ -339,7 +255,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 className="input"
                 value={empCode}
                 onChange={(e) => setEmpCode(e.target.value)}
-                placeholder="e.g. RW002, ADMIN01"
+                placeholder="e.g. RW002 or ADMIN01"
                 required
                 style={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}
               />
@@ -355,7 +271,7 @@ export default function LoginPage({ onLoginSuccess }) {
                 className="input"
                 value={resetVerification}
                 onChange={(e) => setResetVerification(e.target.value)}
-                placeholder="e.g. admin@kaverisilks.in or phone digits"
+                placeholder="e.g. employee@kaverisilks.in or phone digits"
                 required
               />
             </div>
@@ -417,62 +333,22 @@ export default function LoginPage({ onLoginSuccess }) {
               {loading ? 'Verifying & Updating...' : 'Reset Password & Proceed'}
             </button>
 
-            <div style={{ textAlign: 'center', marginTop: 14 }}>
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
               <button
                 type="button"
                 className="link-btn"
                 onClick={() => {
                   setMode('login');
                   setErrorMsg('');
+                  setSuccessMsg('');
                 }}
                 style={{ fontSize: 12.5 }}
               >
-                ← Back to Showroom Sign In
+                ← Back to Sign In
               </button>
             </div>
           </form>
         )}
-
-        {/* Test Credentials Table Guide */}
-        <div className="login-credentials-guide">
-          <div className="credentials-guide-title">
-            <Shield size={14} color="#6d28d9" />
-            <span>Authorized Testing Credentials by Role</span>
-          </div>
-          <table className="credentials-table">
-            <thead>
-              <tr>
-                <th>Role</th>
-                <th>Employee ID</th>
-                <th>Password</th>
-                <th>Assigned Interface</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong style={{ color: '#6d28d9' }}>👑 Floor Manager / Admin</strong></td>
-                <td><code>ADMIN01</code> <span className="alt-code">(or RW012)</span></td>
-                <td><code>Admin@123</code></td>
-                <td>Admin Dashboard, AI, Settings</td>
-              </tr>
-              <tr>
-                <td><strong style={{ color: '#059669' }}>💳 Cashier</strong></td>
-                <td><code>CASH01</code> <span className="alt-code">(or RW028)</span></td>
-                <td><code>Cashier@123</code></td>
-                <td>Showroom POS &amp; Billing Counter</td>
-              </tr>
-              <tr>
-                <td><strong style={{ color: '#2563eb' }}>🛍️ Staff (Sales)</strong></td>
-                <td><code>STAFF01</code> <span className="alt-code">(or RW002)</span></td>
-                <td><code>Staff@123</code></td>
-                <td>Staff Score, Reviews &amp; QR Standee</td>
-              </tr>
-            </tbody>
-          </table>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, textAlign: 'center' }}>
-            💡 All 30 showroom employees (<code>RW001</code> to <code>RW030</code>) also accept their uppercase code as default password.
-          </div>
-        </div>
       </div>
     </div>
   );

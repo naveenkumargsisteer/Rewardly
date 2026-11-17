@@ -978,3 +978,4 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
     </div>
   );
 }
+
