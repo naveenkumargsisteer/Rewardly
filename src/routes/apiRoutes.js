@@ -393,11 +393,31 @@ router.get('/supabase/schema', (req, res, next) => {
   }
 });
 
+function getClientIp(req) {
+  const forwarded =
+    req.headers['x-forwarded-for'] ||
+    req.headers['x-real-ip'] ||
+    req.headers['x-vercel-forwarded-for'];
+  let ip = forwarded
+    ? String(forwarded).split(',')[0].trim()
+    : req.ip || req.socket?.remoteAddress || '127.0.0.1';
+  if (ip && ip.startsWith('::ffff:')) {
+    ip = ip.replace('::ffff:', '');
+  }
+  return ip || '127.0.0.1';
+}
+
 router.get('/public/feedback-target/:empRef', async (req, res, next) => {
   try {
     const repo = getRepository();
     const target = await repo.getEmployeePublicTarget(req.params.empRef);
-    res.json(target);
+    const clientIp = getClientIp(req);
+    const alreadySubmitted = await repo.hasIpSubmittedFeedback(clientIp);
+    res.json({
+      ...target,
+      alreadySubmitted: Boolean(alreadySubmitted),
+      clientIp,
+    });
   } catch (err) {
     next(err);
   }
@@ -406,7 +426,8 @@ router.get('/public/feedback-target/:empRef', async (req, res, next) => {
 router.post('/public/feedback', async (req, res, next) => {
   try {
     const repo = getRepository();
-    const created = await repo.createPublicFeedback(req.body || {});
+    const clientIp = getClientIp(req);
+    const created = await repo.createPublicFeedback(req.body || {}, clientIp);
     res.status(201).json(created);
   } catch (err) {
     next(err);

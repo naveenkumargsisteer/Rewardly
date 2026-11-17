@@ -28,6 +28,17 @@ export default function MobileFeedbackPage({ empRef }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  const [alreadySubmitted, setAlreadySubmitted] = useState(() => {
+    try {
+      return (
+        localStorage.getItem('rewardly_feedback_submitted') === 'true' ||
+        (empRef && localStorage.getItem(`rewardly_fb_${empRef}`) === 'true')
+      );
+    } catch {
+      return false;
+    }
+  });
+
   const [anonymous, setAnonymous] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [rating, setRating] = useState(4.5);
@@ -43,7 +54,12 @@ export default function MobileFeedbackPage({ empRef }) {
     setLoadError('');
     api.getPublicFeedbackTarget(empRef)
       .then((res) => {
-        if (active) setTarget(res);
+        if (active) {
+          setTarget(res);
+          if (res?.alreadySubmitted) {
+            setAlreadySubmitted(true);
+          }
+        }
       })
       .catch((err) => {
         if (active) setLoadError(err.message || 'Unable to load feedback form.');
@@ -70,20 +86,18 @@ export default function MobileFeedbackPage({ empRef }) {
         comment,
       });
       setSubmittedRecord(created);
+      setAlreadySubmitted(true);
+      try {
+        localStorage.setItem('rewardly_feedback_submitted', 'true');
+        if (target.employee?.emp_code) {
+          localStorage.setItem(`rewardly_fb_${target.employee.emp_code}`, 'true');
+        }
+      } catch {}
     } catch (err) {
       setSubmitError(err.message || 'Could not submit feedback. Please try again.');
     } finally {
       setSubmitting(false);
     }
-  }
-
-  function handleResetForm() {
-    setSubmittedRecord(null);
-    setCustomerName('');
-    setAnonymous(false);
-    setRating(4.5);
-    setComment('');
-    setSubmitError('');
   }
 
   const sliderPct = `${((Math.min(5, Math.max(1, Number(rating))) - 1) / 4) * 100}%`;
@@ -126,38 +140,58 @@ export default function MobileFeedbackPage({ empRef }) {
           </div>
         )}
 
-        {!loading && !loadError && target && submittedRecord && (
+        {!loading && !loadError && target && (submittedRecord || alreadySubmitted) && (
           <div className="mobile-feedback-done">
             <div
               style={{
-                width: 60,
-                height: 60,
+                width: 64,
+                height: 64,
                 borderRadius: '50%',
                 background: 'rgba(16, 185, 129, 0.14)',
                 color: '#059669',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                marginBottom: 12,
+                marginBottom: 14,
               }}
             >
-              <CheckCircle2 size={32} />
+              <CheckCircle2 size={34} />
             </div>
-            <h2 style={{ margin: '0 0 6px', fontSize: 20, fontWeight: 800, color: '#1e1b4b' }}>
+            <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 800, color: '#1e1b4b' }}>
               Thank You for Your Feedback!
             </h2>
-            <p style={{ margin: '0 0 16px', fontSize: 13.5, color: 'var(--text-muted)', lineHeight: 1.45 }}>
-              Your <strong>{Number(submittedRecord.rating).toFixed(1)}★</strong> review for{' '}
-              <strong>{target.employee.full_name}</strong> ({target.employee.emp_code}) was
-              submitted {submittedRecord.customer_name === 'Anonymous Customer' ? 'anonymously' : `as ${submittedRecord.customer_name}`}.
+            <p style={{ margin: '0 0 16px', fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              {submittedRecord ? (
+                <>
+                  Your <strong>{Number(submittedRecord.rating).toFixed(1)}★</strong> review for{' '}
+                  <strong>{target.employee.full_name}</strong> ({target.employee.emp_code}) was
+                  recorded {submittedRecord.customer_name === 'Anonymous Customer' ? 'anonymously' : `as ${submittedRecord.customer_name}`}.
+                </>
+              ) : (
+                <>
+                  Your customer review for <strong>{target.employee.full_name}</strong> ({target.employee.emp_code}) has already been recorded from this device / network.
+                </>
+              )}
             </p>
-            <button type="button" className="btn btn-primary mobile-feedback-submit" onClick={handleResetForm}>
-              Submit Another Rating
-            </button>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 16px',
+                borderRadius: 20,
+                background: '#f1f5f9',
+                color: '#475569',
+                fontSize: 12.5,
+                fontWeight: 600,
+              }}
+            >
+              <ShieldCheck size={14} color="#059669" /> One Review Per Customer Enforced
+            </div>
           </div>
         )}
 
-        {!loading && !loadError && target && !submittedRecord && (
+        {!loading && !loadError && target && !submittedRecord && !alreadySubmitted && (
           <form onSubmit={handleSubmit}>
             <div className="mobile-feedback-emp">
               <div

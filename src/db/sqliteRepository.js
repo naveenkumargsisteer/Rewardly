@@ -463,9 +463,31 @@ class SqliteRepository {
     };
   }
 
-  async createPublicFeedback(payload) {
+  async hasIpSubmittedFeedback(clientIp) {
+    if (!clientIp) return false;
+    const cleanIp = String(clientIp).trim();
+    if (!cleanIp || cleanIp === '127.0.0.1' || cleanIp === '::1') {
+      return false;
+    }
+    const row = this.db
+      .prepare('SELECT id FROM customer_feedback WHERE channel LIKE ? LIMIT 1')
+      .get(`%[ip: ${cleanIp}]%`);
+    return Boolean(row);
+  }
+
+  async createPublicFeedback(payload, clientIp = null) {
     const clean = sanitizePublicFeedbackPayload(payload);
+    const cleanIp = clientIp ? String(clientIp).trim() : null;
+
+    if (cleanIp && cleanIp !== '127.0.0.1' && cleanIp !== '::1') {
+      const alreadySubmitted = await this.hasIpSubmittedFeedback(cleanIp);
+      if (alreadySubmitted) {
+        throw httpError(429, `A customer review has already been submitted from this IP address (${cleanIp}). Only one review is allowed per customer.`);
+      }
+    }
+
     const target = await this.getEmployeePublicTarget(clean.empRef);
+    const channelWithIp = cleanIp ? `In-Store QR [ip: ${cleanIp}]` : clean.channel;
 
     const row = {
       id: crypto.randomUUID(),
@@ -476,7 +498,7 @@ class SqliteRepository {
       sentiment: clean.sentiment,
       customer_name: clean.customer_name,
       comment: clean.comment,
-      channel: clean.channel,
+      channel: channelWithIp,
     };
 
     this.db.prepare(`
