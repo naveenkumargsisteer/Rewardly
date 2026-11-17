@@ -11,6 +11,8 @@ const {
   hashPassword,
   parsePhoneAndAuth,
   packPhoneAndAuth,
+  getRoleCategory,
+  isPasswordValid,
 } = require('../utils/authUtils');
 
 const DEFAULT_SETTINGS = {
@@ -147,6 +149,7 @@ class SupabaseRepository {
     return {
       ...emp,
       phone,
+      role_category: getRoleCategory(emp.role, emp.emp_code),
       avatar_url: isPhoto ? emp.avatar_color : null,
       avatar_color: isPhoto ? (departments?.color_hex || '#7C3AED') : emp.avatar_color,
       department_code: departments?.code || '',
@@ -609,13 +612,7 @@ class SupabaseRepository {
     }
 
     const { passwordHash } = parsePhoneAndAuth(emp.phone);
-    let valid = false;
-    if (passwordHash) {
-      valid = hashPassword(pwd) === passwordHash;
-    } else {
-      // Initial default password: emp_code (case-insensitive) or Rewardly@123
-      valid = pwd.toUpperCase() === emp.emp_code.toUpperCase() || pwd === 'Rewardly@123';
-    }
+    const valid = isPasswordValid(pwd, passwordHash, emp.emp_code);
 
     if (!valid) {
       throw httpError(401, 'Invalid password. If you forgot your password, please use "Forgot Password".');
@@ -709,6 +706,83 @@ class SupabaseRepository {
 
     if (error) throw new Error(`Supabase avatar update error: ${error.message}`);
     return this._formatEmployeeRow(updated);
+  }
+
+  async createBillingInvoice(payload) {
+    await this.ensureSeededIfEmpty();
+    const { shop } = await this.getShopAndMeta();
+    const salesEmpId = String(payload.sales_employee_id || '').trim();
+    if (!salesEmpId) {
+      throw httpError(400, 'Assisted Sales Staff is required for showroom sales attribution.');
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(salesEmpId);
+    let query = this.supabase
+      .from('employees')
+      .select('*, departments(code, name, color_hex, target_monthly_sales)');
+    if (isUuid) {
+      query = query.eq('id', salesEmpId);
+    } else {
+      query = query.eq('emp_code', salesEmpId.toUpperCase());
+    }
+    const { data: emps, error: empErr } = await query.limit(1);
+    if (empErr) throw new Error(`Sales staff lookup error: ${empErr.message}`);
+    const emp = emps?.[0];
+    if (!emp) {
+      throw httpError(404, `Sales staff with ID "${salesEmpId}" not found.`);
+    }
+
+    const netAmount = Math.max(0, Math.round(Number(payload.net_amount || payload.gross_amount || 0)));
+    const grossAmount = Math.max(netAmount, Math.round(Number(payload.gross_amount || netAmount)));
+    const saleDate = payload.sale_date || new Date().toISOString().slice(0, 10);
+    const invoiceNo = payload.invoice_no || `INV-${Date.now().toString().slice(-6)}`;
+
+    const saleRow = {
+      id: crypto.randomUUID ? crypto.randomUUID() : `sale_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      shop_id: shop.id,
+      employee_id: emp.id,
+      sale_date: saleDate,
+      bills_count: 1,
+      items_sold: (payload.items || []).reduce((sum, it) => sum + (Number(it.qty) || 1), 0) || 1,
+      gross_amount_inr: grossAmount,
+      returns_inr: 0,
+      net_amount_inr: netAmount,
+      upsell_count: 0,
+      category: emp.departments?.name || emp.department_name || 'Silk & Sarees',
+    };
+
+    const { error: insertErr } = await this.supabase
+      .from('sales_records')
+      .insert(saleRow);
+    if (insertErr) throw new Error(`Supabase billing sale record error: ${insertErr.message}`);
+
+    const invoice = {
+      id: saleRow.id,
+      invoice_no: invoiceNo,
+      counter_id: payload.counter_id || 'POS-KVR-01',
+      cashier_id: payload.cashier_id || 'CASH01',
+      cashier_name: payload.cashier_name || 'Harshvardhan Singh',
+      sales_employee_id: emp.id,
+      sales_emp_code: emp.emp_code,
+      sales_employee_name: emp.full_name,
+      customer_name: payload.customer_name || 'Walk-in Customer',
+      customer_phone: payload.customer_phone || '',
+      items: payload.items || [],
+      items_count: (payload.items || []).reduce((sum, it) => sum + (Number(it.qty) || 1), 0),
+      gross_amount: grossAmount,
+      discount_amount: Number(payload.discount_amount || 0),
+      tax_amount: Number(payload.tax_amount || Math.round(netAmount * 0.05)),
+      net_amount: netAmount,
+      payment_method: payload.payment_method || 'UPI',
+      created_at: new Date().toISOString(),
+    };
+
+    return {
+      success: true,
+      message: `Invoice ${invoiceNo} completed! ₹${netAmount.toLocaleString('en-IN')} credited to ${emp.full_name} (${emp.emp_code}).`,
+      invoice,
+      salesEmployee: this._formatEmployeeRow(emp),
+    };
   }
 
   async insertSalesRows(rows) {

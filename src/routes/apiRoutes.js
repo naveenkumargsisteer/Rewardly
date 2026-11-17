@@ -413,5 +413,78 @@ router.post('/public/feedback', async (req, res, next) => {
   }
 });
 
+// Billing & POS Counter Routes
+const TEXTILE_CATALOG = [
+  { id: 'cat_01', name: 'Pure Kanjeevaram Bridal Silk Saree', dept_code: 'SILK', dept_name: 'Silk & Sarees', price_inr: 18500, sku: 'SILK-KAN-01', tax_pct: 5 },
+  { id: 'cat_02', name: 'Banarasi Brocade Silk Saree with Zari', dept_code: 'SILK', dept_name: 'Silk & Sarees', price_inr: 14200, sku: 'SILK-BAN-02', tax_pct: 5 },
+  { id: 'cat_03', name: 'Mysore Crepe Silk Handloom Saree', dept_code: 'SILK', dept_name: 'Silk & Sarees', price_inr: 8900, sku: 'SILK-MYS-03', tax_pct: 5 },
+  { id: 'cat_04', name: 'Tussar Handwoven Silk with Blouse', dept_code: 'SILK', dept_name: 'Silk & Sarees', price_inr: 6400, sku: 'SILK-TUS-04', tax_pct: 5 },
+  { id: 'cat_05', name: 'Hand-Embroidered Velvet Bridal Lehenga', dept_code: 'ETHN', dept_name: 'Ethnic & Bridal', price_inr: 32000, sku: 'ETH-LEH-01', tax_pct: 5 },
+  { id: 'cat_06', name: 'Raw Silk Sherwani with Stole & Churidar', dept_code: 'ETHN', dept_name: 'Ethnic & Bridal', price_inr: 22500, sku: 'ETH-SHW-02', tax_pct: 5 },
+  { id: 'cat_07', name: 'Festive Georgette Anarkali Suit Set', dept_code: 'ETHN', dept_name: 'Ethnic & Bridal', price_inr: 7800, sku: 'ETH-ANK-03', tax_pct: 5 },
+  { id: 'cat_08', name: 'Italian Wool Blend 2-Piece Suit Length', dept_code: 'MENS', dept_name: 'Menswear & Formals', price_inr: 11500, sku: 'MEN-SUT-01', tax_pct: 5 },
+  { id: 'cat_09', name: 'Pure Silk Dhoti with Gold Angavastram', dept_code: 'MENS', dept_name: 'Menswear & Formals', price_inr: 3800, sku: 'MEN-DHO-02', tax_pct: 5 },
+  { id: 'cat_10', name: 'Premium Cotton Jacquard Kurta Set', dept_code: 'MENS', dept_name: 'Menswear & Formals', price_inr: 3200, sku: 'MEN-KUR-03', tax_pct: 5 },
+  { id: 'cat_11', name: 'Kids Traditional Pattu Pavada Set', dept_code: 'KIDS', dept_name: 'Kids & Casuals', price_inr: 2600, sku: 'KID-PAT-01', tax_pct: 5 },
+  { id: 'cat_12', name: 'Boys Silk Kurta Pyjama with Waistcoat', dept_code: 'KIDS', dept_name: 'Kids & Casuals', price_inr: 2200, sku: 'KID-KUR-02', tax_pct: 5 },
+  { id: 'cat_13', name: 'Pure Cotton Jacquard Double Bedspread Set', dept_code: 'HOME', dept_name: 'Home & Linen', price_inr: 3400, sku: 'HOM-BED-01', tax_pct: 5 },
+  { id: 'cat_14', name: 'Handcrafted Banarasi Cushion Covers (Set of 5)', dept_code: 'HOME', dept_name: 'Home & Linen', price_inr: 1800, sku: 'HOM-CSH-02', tax_pct: 5 },
+];
+
+router.get('/billing/init', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const [{ shop }, departments, employees] = await Promise.all([
+      repo.getShopAndMeta(),
+      repo.getDepartments(),
+      repo.getEmployees(),
+    ]);
+
+    // Active sales staff for attribution
+    const salesStaff = employees.filter((e) => e.status !== 'inactive');
+
+    res.json({
+      shop: {
+        name: shop?.name || 'Kaveri Silks & Textiles',
+        tagline: shop?.tagline || 'Flagship Textile Showroom',
+        location: shop?.location || 'Commercial Street & Jayanagar Flagship, Bengaluru',
+        currency: 'INR',
+        gstin: '29AABCK1234F1Z5',
+        tax_rate_pct: 5,
+      },
+      counter: {
+        id: 'POS-KVR-01',
+        name: 'Counter #1 (Main Silk Floor)',
+        terminal_code: 'TERM-01',
+      },
+      departments,
+      catalog: TEXTILE_CATALOG,
+      salesStaff: salesStaff.map((s) => ({
+        id: s.id,
+        emp_code: s.emp_code,
+        full_name: s.full_name,
+        role: s.role,
+        role_category: s.role_category,
+        department_name: s.department_name,
+        avatar_url: s.avatar_url,
+        avatar_color: s.avatar_color,
+        avatar_initials: s.avatar_initials,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/billing/create-invoice', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const result = await repo.createBillingInvoice(req.body || {});
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
 

@@ -3,24 +3,15 @@ import {
   Award,
   Bell,
   ChevronDown,
+  CreditCard,
   LayoutDashboard,
   LogOut,
-  QrCode,
   Settings,
+  Store,
   User,
   UserCheck,
 } from 'lucide-react';
 import EmployeeAvatar from './EmployeeAvatar';
-
-function getOwnerInitials(name) {
-  const parts = String(name || 'Rajeshwari Deshpande')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (parts.length === 0) return 'RD';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-}
 
 export default function TopHeader({
   activePage,
@@ -30,9 +21,8 @@ export default function TopHeader({
   pendingRewards,
   onOpenRecognize,
   onSelectInsightsTab,
-  loggedInEmployee,
-  onOpenEmployeeLogin,
-  onEmployeeLogout,
+  currentUser,
+  onLogout,
 }) {
   const [showNotifs, setShowNotifs] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -52,8 +42,9 @@ export default function TopHeader({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  const ownerName = shop?.owner_name || 'Rajeshwari Deshpande';
-  const ownerInitials = getOwnerInitials(ownerName);
+  const userName = currentUser?.full_name || shop?.owner_name || 'Rajeshwari Deshpande';
+  const userRole = currentUser?.role || 'Floor Manager / Admin';
+  const roleCategory = currentUser?.role_category || 'admin';
 
   function goToPage(page) {
     setShowProfileMenu(false);
@@ -64,9 +55,11 @@ export default function TopHeader({
   const headerTitle =
     activePage === 'settings'
       ? 'Rewardly Settings'
-      : activePage === 'employee-portal'
-        ? `Employee Portal — ${loggedInEmployee?.full_name || 'Staff'}`
-        : 'Rewardly Performance & Loyalty';
+      : activePage === 'billing'
+        ? 'Showroom POS & Billing'
+        : activePage === 'employee-portal'
+          ? `Staff Portal — ${currentUser?.full_name || 'Staff'}`
+          : 'Rewardly Performance & Loyalty';
 
   return (
     <header className="top-header">
@@ -74,9 +67,9 @@ export default function TopHeader({
         <button
           type="button"
           className="brand-logo"
-          onClick={() => goToPage('dashboard')}
-          title="Rewardly Dashboard"
-          aria-label="Go to Dashboard"
+          onClick={() => goToPage(roleCategory === 'cashier' ? 'billing' : roleCategory === 'staff' ? 'employee-portal' : 'dashboard')}
+          title="Rewardly"
+          aria-label="Go to Home"
         >
           <img src="/rewardly-logo.png" alt="Rewardly logo" className="brand-logo-img" />
         </button>
@@ -92,114 +85,104 @@ export default function TopHeader({
       </div>
 
       <div className="header-actions">
-        {/* Employee Portal / Staff Pill */}
-        {loggedInEmployee ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {/* Admin Navigation Controls */}
+        {roleCategory === 'admin' && (
+          <>
             <button
               type="button"
-              className={`btn btn-sm ${activePage === 'employee-portal' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => goToPage('employee-portal')}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px' }}
-              title="Open My Staff Portal"
+              className={`btn btn-sm ${activePage === 'billing' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => goToPage('billing')}
+              title="Open Showroom POS & Billing Interface"
             >
-              <EmployeeAvatar employee={loggedInEmployee} size={22} />
-              <span>
-                <strong>{loggedInEmployee.full_name?.split(' ')[0]}</strong> ({loggedInEmployee.emp_code})
-              </span>
+              <CreditCard size={14} />
+              <span>POS Billing</span>
             </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={onOpenEmployeeLogin}
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-            title="Sign in with Employee ID"
-          >
-            <User size={14} />
-            <span>Employee Login</span>
-          </button>
-        )}
 
-        {activePage !== 'employee-portal' && (
-          <button type="button" className="btn btn-primary btn-sm" onClick={onOpenRecognize}>
-            <Award size={14} />
-            Give Recognition
-          </button>
-        )}
-
-        <div ref={notifRef} style={{ position: 'relative' }}>
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Notifications"
-            onClick={() => {
-              setShowNotifs((v) => !v);
-              setShowProfileMenu(false);
-            }}
-          >
-            <Bell size={17} />
-            {pendingRewards.length > 0 && (
-              <span className="notif-dot">{pendingRewards.length}</span>
+            {activePage !== 'employee-portal' && (
+              <button type="button" className="btn btn-primary btn-sm" onClick={onOpenRecognize}>
+                <Award size={14} />
+                Give Recognition
+              </button>
             )}
-          </button>
+          </>
+        )}
 
-          {showNotifs && (
-            <div
-              className="card"
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 46,
-                width: 320,
-                padding: 14,
-                zIndex: 60,
-                boxShadow: '0 18px 40px rgba(15,23,42,0.16)',
+        {/* Notifications (Only for Admin / Floor Manager) */}
+        {roleCategory === 'admin' && (
+          <div ref={notifRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Notifications"
+              onClick={() => {
+                setShowNotifs((v) => !v);
+                setShowProfileMenu(false);
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <strong style={{ fontSize: 13 }}>Pending Reward Approvals</strong>
-                <button
-                  type="button"
-                  className="link-btn"
-                  onClick={() => {
-                    setShowNotifs(false);
-                    onNavigate('dashboard');
-                    onSelectInsightsTab();
-                  }}
-                >
-                  Review Queue
-                </button>
-              </div>
-              {pendingRewards.length === 0 ? (
-                <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-                  All AI reward recommendations have been reviewed.
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {pendingRewards.slice(0, 4).map((r) => (
-                    <div
-                      key={r.id}
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: 10,
-                        background: '#f8f9fd',
-                        border: '1px solid var(--border)',
-                        fontSize: 12,
-                      }}
-                    >
-                      <div style={{ fontWeight: 700 }}>{r.employee_name}</div>
-                      <div style={{ color: 'var(--text-muted)' }}>
-                        {r.reward_title} • ₹{Number(r.bonus_amount_inr).toLocaleString('en-IN')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <Bell size={17} />
+              {pendingRewards.length > 0 && (
+                <span className="notif-dot">{pendingRewards.length}</span>
               )}
-            </div>
-          )}
-        </div>
+            </button>
 
+            {showNotifs && (
+              <div
+                className="card"
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: 46,
+                  width: 320,
+                  padding: 14,
+                  zIndex: 60,
+                  boxShadow: '0 18px 40px rgba(15,23,42,0.16)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <strong style={{ fontSize: 13 }}>Pending Reward Approvals</strong>
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => {
+                      setShowNotifs(false);
+                      onNavigate('dashboard');
+                      onSelectInsightsTab?.();
+                    }}
+                  >
+                    Review Queue
+                  </button>
+                </div>
+                {pendingRewards.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+                    All AI reward recommendations have been reviewed.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {pendingRewards.slice(0, 4).map((r) => (
+                      <div
+                        key={r.id}
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: 10,
+                          background: '#f8f9fd',
+                          border: '1px solid var(--border)',
+                          fontSize: 12,
+                        }}
+                      >
+                        <div style={{ fontWeight: 700 }}>{r.employee_name}</div>
+                        <div style={{ color: 'var(--text-muted)' }}>
+                          {r.reward_title} • ₹{Number(r.bonus_amount_inr).toLocaleString('en-IN')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* User Profile Dropdown Chip */}
         <div ref={profileRef} style={{ position: 'relative' }}>
           <button
             type="button"
@@ -211,10 +194,14 @@ export default function TopHeader({
             aria-expanded={showProfileMenu}
             aria-haspopup="menu"
           >
-            <span className="avatar" style={{ background: '#6d28d9' }}>{ownerInitials}</span>
+            <EmployeeAvatar employee={currentUser} size={30} />
             <div style={{ textAlign: 'left' }}>
-              <div className="owner-name">{ownerName}</div>
-              <div className="owner-role">Showroom Owner</div>
+              <div className="owner-name">{userName}</div>
+              <div className="owner-role" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {roleCategory === 'admin' && '👑 Floor Manager / Admin'}
+                {roleCategory === 'cashier' && '💳 Cashier'}
+                {roleCategory === 'staff' && '🛍️ Sales Staff'}
+              </div>
             </div>
             <ChevronDown
               size={14}
@@ -231,53 +218,64 @@ export default function TopHeader({
             <div className="card profile-dropdown" role="menu">
               <div className="profile-dropdown-head">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span className="avatar" style={{ background: '#6d28d9', width: 36, height: 36 }}>
-                    {ownerInitials}
-                  </span>
+                  <EmployeeAvatar employee={currentUser} size={36} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {ownerName}
+                      {userName}
                     </div>
                     <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                      Showroom Owner
+                      ID: {currentUser?.emp_code || 'ADMIN01'} • {userRole}
                     </div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, fontSize: 11.5, color: 'var(--text-muted)' }}>
                   <img src="/rewardly-logo.png" alt="Rewardly" style={{ width: 15, height: 15, objectFit: 'contain' }} />
-                  <span>Rewardly • {employeeCount ?? 30} Staff • 4-Month Window</span>
+                  <span>Rewardly • {employeeCount ?? 30} Staff • Flagship Showroom</span>
                 </div>
               </div>
 
               <div className="profile-dropdown-items">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`profile-menu-item ${activePage === 'dashboard' ? 'active' : ''}`}
-                  onClick={() => goToPage('dashboard')}
-                >
-                  <LayoutDashboard size={16} />
-                  <div>
-                    <div className="profile-item-title">Dashboard</div>
-                    <div className="profile-item-sub">Static &amp; Custom AI Views</div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`profile-menu-item ${activePage === 'settings' ? 'active' : ''}`}
-                  onClick={() => goToPage('settings')}
-                >
-                  <Settings size={16} />
-                  <div>
-                    <div className="profile-item-title">Settings</div>
-                    <div className="profile-item-sub">Weights, Showroom, Staff &amp; Depts</div>
-                  </div>
-                </button>
-
-                {loggedInEmployee ? (
+                {roleCategory === 'admin' ? (
                   <>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={`profile-menu-item ${activePage === 'dashboard' ? 'active' : ''}`}
+                      onClick={() => goToPage('dashboard')}
+                    >
+                      <LayoutDashboard size={16} />
+                      <div>
+                        <div className="profile-item-title">Dashboard</div>
+                        <div className="profile-item-sub">KPIs, AI Assistant &amp; Employee Roster</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={`profile-menu-item ${activePage === 'settings' ? 'active' : ''}`}
+                      onClick={() => goToPage('settings')}
+                    >
+                      <Settings size={16} />
+                      <div>
+                        <div className="profile-item-title">Settings</div>
+                        <div className="profile-item-sub">Weights, Staff &amp; Departments</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={`profile-menu-item ${activePage === 'billing' ? 'active' : ''}`}
+                      onClick={() => goToPage('billing')}
+                    >
+                      <CreditCard size={16} />
+                      <div>
+                        <div className="profile-item-title">Showroom POS &amp; Billing</div>
+                        <div className="profile-item-sub">Terminal POS-KVR-01 Counter</div>
+                      </div>
+                    </button>
+
                     <button
                       type="button"
                       role="menuitem"
@@ -286,44 +284,57 @@ export default function TopHeader({
                     >
                       <UserCheck size={16} />
                       <div>
-                        <div className="profile-item-title">My Employee Portal</div>
-                        <div className="profile-item-sub">Logged in as {loggedInEmployee.emp_code}</div>
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="profile-menu-item"
-                      onClick={() => {
-                        setShowProfileMenu(false);
-                        onEmployeeLogout?.();
-                      }}
-                      style={{ color: '#dc2626' }}
-                    >
-                      <LogOut size={16} />
-                      <div>
-                        <div className="profile-item-title" style={{ color: '#dc2626' }}>Employee Sign Out</div>
-                        <div className="profile-item-sub">Log out of staff session</div>
+                        <div className="profile-item-title">Staff Portal View</div>
+                        <div className="profile-item-sub">Preview Employee Score &amp; QR Standee</div>
                       </div>
                     </button>
                   </>
+                ) : roleCategory === 'cashier' ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`profile-menu-item ${activePage === 'billing' ? 'active' : ''}`}
+                    onClick={() => goToPage('billing')}
+                  >
+                    <CreditCard size={16} />
+                    <div>
+                      <div className="profile-item-title">POS Billing Counter</div>
+                      <div className="profile-item-sub">Terminal POS-KVR-01</div>
+                    </div>
+                  </button>
                 ) : (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`profile-menu-item ${activePage === 'employee-portal' ? 'active' : ''}`}
+                    onClick={() => goToPage('employee-portal')}
+                  >
+                    <UserCheck size={16} />
+                    <div>
+                      <div className="profile-item-title">My Staff Portal</div>
+                      <div className="profile-item-sub">Performance, Reviews &amp; QR</div>
+                    </div>
+                  </button>
+                )}
+
+                <div style={{ borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 4 }}>
                   <button
                     type="button"
                     role="menuitem"
                     className="profile-menu-item"
                     onClick={() => {
                       setShowProfileMenu(false);
-                      onOpenEmployeeLogin();
+                      onLogout();
                     }}
+                    style={{ color: '#dc2626' }}
                   >
-                    <User size={16} />
+                    <LogOut size={16} />
                     <div>
-                      <div className="profile-item-title">Employee Login</div>
-                      <div className="profile-item-sub">Access Staff Portal &amp; Counter QR</div>
+                      <div className="profile-item-title" style={{ color: '#dc2626' }}>Sign Out</div>
+                      <div className="profile-item-sub">Return to Showroom Login</div>
                     </div>
                   </button>
-                )}
+                </div>
               </div>
             </div>
           )}

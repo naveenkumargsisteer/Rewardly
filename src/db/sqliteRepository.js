@@ -12,6 +12,8 @@ const {
   hashPassword,
   parsePhoneAndAuth,
   packPhoneAndAuth,
+  getRoleCategory,
+  isPasswordValid,
 } = require('../utils/authUtils');
 
 class SqliteRepository {
@@ -71,6 +73,7 @@ class SqliteRepository {
     return {
       ...row,
       phone,
+      role_category: getRoleCategory(row.role, row.emp_code),
       avatar_url: isPhoto ? row.avatar_color : null,
       avatar_color: isPhoto ? (row.department_color || '#7C3AED') : row.avatar_color,
     };
@@ -520,12 +523,7 @@ class SqliteRepository {
     }
 
     const { passwordHash } = parsePhoneAndAuth(row.phone);
-    let valid = false;
-    if (passwordHash) {
-      valid = hashPassword(pwd) === passwordHash;
-    } else {
-      valid = pwd.toUpperCase() === row.emp_code.toUpperCase() || pwd === 'Rewardly@123';
-    }
+    const valid = isPasswordValid(pwd, passwordHash, row.emp_code);
 
     if (!valid) {
       throw httpError(401, 'Invalid password. If you forgot your password, please use "Forgot Password".');
@@ -599,6 +597,77 @@ class SqliteRepository {
 
     this.db.prepare('UPDATE employees SET avatar_color = ? WHERE id = ?').run(nextColorVal, id);
     return this._getEmployeeById(id);
+  }
+
+  async createBillingInvoice(payload) {
+    const { shop } = await this.getShopAndMeta();
+    const salesEmpId = String(payload.sales_employee_id || '').trim();
+    if (!salesEmpId) {
+      throw httpError(400, 'Assisted Sales Staff is required for showroom sales attribution.');
+    }
+
+    const row = this.db.prepare(`
+      SELECT e.*, d.code AS department_code, d.name AS department_name, d.color_hex AS department_color, d.target_monthly_sales
+      FROM employees e
+      JOIN departments d ON d.id = e.department_id
+      WHERE e.id = ? OR LOWER(e.emp_code) = LOWER(?)
+      LIMIT 1
+    `).get(salesEmpId, salesEmpId);
+
+    if (!row) {
+      throw httpError(404, `Sales staff with ID "${salesEmpId}" not found.`);
+    }
+
+    const netAmount = Math.max(0, Math.round(Number(payload.net_amount || payload.gross_amount || 0)));
+    const grossAmount = Math.max(netAmount, Math.round(Number(payload.gross_amount || netAmount)));
+    const saleDate = payload.sale_date || new Date().toISOString().slice(0, 10);
+    const invoiceNo = payload.invoice_no || `INV-${Date.now().toString().slice(-6)}`;
+    const saleId = crypto.randomUUID();
+
+    this.db.prepare(`
+      INSERT INTO sales_records (id, shop_id, employee_id, sale_date, bills_count, items_sold, gross_amount_inr, returns_inr, net_amount_inr, upsell_count, category)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      saleId,
+      shop.id,
+      row.id,
+      saleDate,
+      1,
+      (payload.items || []).length || 1,
+      grossAmount,
+      0,
+      netAmount,
+      0,
+      row.department_name
+    );
+
+    const invoice = {
+      id: saleId,
+      invoice_no: invoiceNo,
+      counter_id: payload.counter_id || 'POS-KVR-01',
+      cashier_id: payload.cashier_id || 'CASH01',
+      cashier_name: payload.cashier_name || 'Harshvardhan Singh',
+      sales_employee_id: row.id,
+      sales_emp_code: row.emp_code,
+      sales_employee_name: row.full_name,
+      customer_name: payload.customer_name || 'Walk-in Customer',
+      customer_phone: payload.customer_phone || '',
+      items: payload.items || [],
+      items_count: (payload.items || []).reduce((sum, it) => sum + (Number(it.qty) || 1), 0),
+      gross_amount: grossAmount,
+      discount_amount: Number(payload.discount_amount || 0),
+      tax_amount: Number(payload.tax_amount || Math.round(netAmount * 0.05)),
+      net_amount: netAmount,
+      payment_method: payload.payment_method || 'UPI',
+      created_at: new Date().toISOString(),
+    };
+
+    return {
+      success: true,
+      message: `Invoice ${invoiceNo} completed! ₹${netAmount.toLocaleString('en-IN')} credited to ${row.full_name} (${row.emp_code}).`,
+      invoice,
+      salesEmployee: this._formatEmployee(row),
+    };
   }
 
   async insertSalesRows(rows) {

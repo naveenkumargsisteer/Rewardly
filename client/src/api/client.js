@@ -91,7 +91,41 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ avatar_url }),
     }),
+  getBillingInit: () => request('/api/billing/init'),
+  createBillingInvoice: (payload) =>
+    request('/api/billing/create-invoice', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };
+
+export function getRoleCategory(role, empCode = '') {
+  const code = String(empCode || '').trim().toUpperCase();
+  if (code === 'ADMIN01' || code === 'ADMIN') return 'admin';
+  if (code === 'CASH01' || code === 'CASHIER') return 'cashier';
+  if (code === 'STAFF01' || code === 'STAFF') return 'staff';
+
+  const r = String(role || '').toLowerCase();
+  if (
+    r.includes('floor manager') ||
+    r.includes('admin') ||
+    r.includes('owner') ||
+    r.includes('store manager') ||
+    r.includes('assistant manager') ||
+    r.includes('floor lead')
+  ) {
+    return 'admin';
+  }
+  if (
+    r.includes('cashier') ||
+    r.includes('billing') ||
+    r.includes('pos') ||
+    r.includes('cash desk')
+  ) {
+    return 'cashier';
+  }
+  return 'staff';
+}
 
 /**
  * Client-side minimal resolution image compressor for avatars.

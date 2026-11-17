@@ -1,42 +1,51 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
-import { api } from './api/client';
+import { api, getRoleCategory } from './api/client';
 import TopHeader from './components/TopHeader';
 import DashboardPage from './pages/DashboardPage';
 import SettingsPage from './pages/SettingsPage';
 import EmployeePortalPage from './pages/EmployeePortalPage';
+import BillingPage from './pages/BillingPage';
 import MobileFeedbackPage from './pages/MobileFeedbackPage';
+import LoginPage from './pages/LoginPage';
 import EmployeesModal from './components/EmployeesModal';
 import GiveRecognitionModal from './components/GiveRecognitionModal';
-import EmployeeLoginModal from './components/EmployeeLoginModal';
 
 export default function App() {
+  // Public customer rating QR destination (/feedback/:empRef) - NO LOGIN REQUIRED
   const feedbackMatch = window.location.pathname.match(/^\/feedback\/([^/]+)/i);
   const feedbackEmpRef = feedbackMatch ? decodeURIComponent(feedbackMatch[1]) : null;
   if (feedbackEmpRef) {
     return <MobileFeedbackPage empRef={feedbackEmpRef} />;
   }
 
-  const initialPage = window.location.pathname.includes('settings')
-    ? 'settings'
-    : window.location.pathname.includes('portal')
-      ? 'employee-portal'
-      : 'dashboard';
-
-  const [activePage, setActivePage] = useState(initialPage);
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiTab, setAiTab] = useState('chat');
-
-  // Employee Login & Portal Session State
-  const [loggedInEmployee, setLoggedInEmployee] = useState(() => {
+  // Unified Role-Based User Authentication Session
+  const [currentUser, setCurrentUser] = useState(() => {
     try {
-      const saved = localStorage.getItem('rewardly_employee_user');
-      return saved ? JSON.parse(saved) : null;
+      const saved = localStorage.getItem('rewardly_auth_user') || localStorage.getItem('rewardly_employee_user');
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      const roleCategory = parsed.role_category || getRoleCategory(parsed.role, parsed.emp_code);
+      return { ...parsed, role_category: roleCategory };
     } catch {
       return null;
     }
   });
-  const [employeeLoginModalOpen, setEmployeeLoginModalOpen] = useState(false);
+
+  // Active page resolution based on current role
+  const [activePage, setActivePage] = useState(() => {
+    if (!currentUser) return 'login';
+    const cat = currentUser.role_category || getRoleCategory(currentUser.role, currentUser.emp_code);
+    if (cat === 'cashier') return 'billing';
+    if (cat === 'staff') return 'employee-portal';
+    if (window.location.pathname.includes('settings')) return 'settings';
+    if (window.location.pathname.includes('billing')) return 'billing';
+    if (window.location.pathname.includes('portal')) return 'employee-portal';
+    return 'dashboard';
+  });
+
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiTab, setAiTab] = useState('chat');
 
   const [meta, setMeta] = useState(null);
   const [startDate, setStartDate] = useState('2026-07-12');
@@ -57,7 +66,7 @@ export default function App() {
     setToastMsg(msg);
     setTimeout(() => {
       setToastMsg((prev) => (prev === msg ? '' : prev));
-    }, 3200);
+    }, 3400);
   }, []);
 
   const loadMetaAndDash = useCallback(async (sDate, eDate, dept) => {
@@ -86,6 +95,7 @@ export default function App() {
   }, [showToast]);
 
   useEffect(() => {
+    if (!currentUser) return;
     setApiError('');
     api.getMeta()
       .then((m) => {
@@ -102,36 +112,58 @@ export default function App() {
         showToast(err.message);
       })
       .finally(() => setLoadingDash(false));
-  }, [showToast]);
+  }, [currentUser, showToast]);
 
   function handleNavigate(page) {
     setActivePage(page);
     const nextUrl =
-      page === 'settings' ? '/settings' : page === 'employee-portal' ? '/portal' : '/';
+      page === 'settings'
+        ? '/settings'
+        : page === 'billing'
+          ? '/billing'
+          : page === 'employee-portal'
+            ? '/portal'
+            : '/';
     window.history.pushState({}, '', nextUrl);
   }
 
-  function handleEmployeeLoginSuccess(employee, isDefaultPassword) {
-    setLoggedInEmployee(employee);
+  function handleLoginSuccess(user, isDefaultPassword) {
+    const roleCat = user.role_category || getRoleCategory(user.role, user.emp_code);
+    const enrichedUser = { ...user, role_category: roleCat };
+
+    setCurrentUser(enrichedUser);
     try {
-      localStorage.setItem('rewardly_employee_user', JSON.stringify(employee));
-    } catch {
-      // localStorage may fail in private mode
+      localStorage.setItem('rewardly_auth_user', JSON.stringify(enrichedUser));
+    } catch {}
+
+    // Route to role-specific interface
+    if (roleCat === 'cashier') {
+      handleNavigate('billing');
+      showToast(`Welcome, ${user.full_name}! POS Billing Terminal ready.`);
+    } else if (roleCat === 'staff') {
+      handleNavigate('employee-portal');
+      showToast(`Welcome, ${user.full_name}! Staff Portal ready.`);
+    } else {
+      handleNavigate('dashboard');
+      showToast(`Welcome, ${user.full_name}! Showroom Admin Dashboard loaded.`);
     }
-    handleNavigate('employee-portal');
-    showToast(`Welcome, ${employee.full_name}! Signed in as ${employee.emp_code}.`);
+
     if (isDefaultPassword) {
-      showToast('Tip: Consider changing your default password in the portal.');
+      setTimeout(() => {
+        showToast('Tip: Consider changing your default password.');
+      }, 1500);
     }
   }
 
-  function handleEmployeeLogout() {
-    setLoggedInEmployee(null);
+  function handleLogout() {
+    setCurrentUser(null);
     try {
+      localStorage.removeItem('rewardly_auth_user');
       localStorage.removeItem('rewardly_employee_user');
     } catch {}
-    handleNavigate('dashboard');
-    showToast('Logged out of Employee Portal.');
+    setActivePage('login');
+    window.history.pushState({}, '', '/');
+    showToast('Signed out successfully.');
   }
 
   function handleChangeRange(nextStart, nextEnd) {
@@ -160,19 +192,35 @@ export default function App() {
     }
   }
 
+  // If user is not authenticated, show the secure Role-Based Login Gateway
+  if (!currentUser) {
+    return (
+      <>
+        <LoginPage onLoginSuccess={handleLoginSuccess} />
+        {toastMsg && (
+          <div className="toast" role="status">
+            <CheckCircle2 size={16} color="#10b981" />
+            <span>{toastMsg}</span>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  const roleCategory = currentUser.role_category || getRoleCategory(currentUser.role, currentUser.emp_code);
   const pendingRewards = (dashboard?.rewards || []).filter((r) => r.status === 'Pending');
 
   return (
     <div className="app-shell">
+      {/* Top Header: Displays user identity and role controls. NO "Employee Login" button in main admin! */}
       <TopHeader
         activePage={activePage}
         onNavigate={handleNavigate}
         shop={dashboard?.meta?.shop || meta?.shop}
         employeeCount={meta?.counts?.employees}
         pendingRewards={pendingRewards}
-        loggedInEmployee={loggedInEmployee}
-        onOpenEmployeeLogin={() => setEmployeeLoginModalOpen(true)}
-        onEmployeeLogout={handleEmployeeLogout}
+        currentUser={currentUser}
+        onLogout={handleLogout}
         onOpenRecognize={() => {
           setRecognizeEmpId(null);
           setRecognizeModalOpen(true);
@@ -183,8 +231,8 @@ export default function App() {
         }}
       />
 
-      <main className="page-container">
-        {apiError && (
+      <main className="page-container" style={activePage === 'billing' ? { padding: 0, maxWidth: '100%' } : {}}>
+        {apiError && activePage !== 'billing' && (
           <div
             className="card"
             role="alert"
@@ -218,7 +266,28 @@ export default function App() {
           </div>
         )}
 
-        {activePage === 'dashboard' ? (
+        {/* Dynamic Role-Based Interface Routing */}
+        {activePage === 'billing' ? (
+          <BillingPage
+            user={currentUser}
+            onLogout={handleLogout}
+            onSwitchToManager={() => handleNavigate('dashboard')}
+            showToast={showToast}
+          />
+        ) : activePage === 'employee-portal' ? (
+          <EmployeePortalPage
+            employee={currentUser}
+            onLogout={handleLogout}
+            onSwitchToManager={() => handleNavigate('dashboard')}
+            showToast={showToast}
+          />
+        ) : activePage === 'settings' ? (
+          <SettingsPage
+            onBack={() => handleNavigate('dashboard')}
+            onSettingsSaved={() => loadMetaAndDash(startDate, endDate, department)}
+            showToast={showToast}
+          />
+        ) : (
           <DashboardPage
             dashboard={dashboard}
             loading={loadingDash}
@@ -244,53 +313,39 @@ export default function App() {
             onRewardAction={handleRewardAction}
             showToast={showToast}
           />
-        ) : activePage === 'settings' ? (
-          <SettingsPage
-            onBack={() => handleNavigate('dashboard')}
-            onSettingsSaved={() => loadMetaAndDash(startDate, endDate, department)}
-            showToast={showToast}
-          />
-        ) : (
-          <EmployeePortalPage
-            employee={loggedInEmployee}
-            onLogout={handleEmployeeLogout}
-            onSwitchToManager={() => handleNavigate('dashboard')}
-            showToast={showToast}
-          />
         )}
       </main>
 
-      <EmployeeLoginModal
-        isOpen={employeeLoginModalOpen}
-        onClose={() => setEmployeeLoginModalOpen(false)}
-        onLoginSuccess={handleEmployeeLoginSuccess}
-      />
+      {/* Admin Modals */}
+      {roleCategory === 'admin' && (
+        <>
+          <EmployeesModal
+            isOpen={employeesModalOpen}
+            initialEmployeeId={selectedEmpId}
+            employees={dashboard?.employeesRanked || []}
+            departments={meta?.departments || []}
+            startDate={startDate}
+            endDate={endDate}
+            onClose={() => setEmployeesModalOpen(false)}
+            onOpenRecognizeFor={(empId) => {
+              setRecognizeEmpId(empId);
+              setRecognizeModalOpen(true);
+            }}
+          />
 
-      <EmployeesModal
-        isOpen={employeesModalOpen}
-        initialEmployeeId={selectedEmpId}
-        employees={dashboard?.employeesRanked || []}
-        departments={meta?.departments || []}
-        startDate={startDate}
-        endDate={endDate}
-        onClose={() => setEmployeesModalOpen(false)}
-        onOpenRecognizeFor={(empId) => {
-          setRecognizeEmpId(empId);
-          setRecognizeModalOpen(true);
-        }}
-      />
-
-      <GiveRecognitionModal
-        isOpen={recognizeModalOpen}
-        employees={dashboard?.employeesRanked || []}
-        preselectedEmployeeId={recognizeEmpId}
-        defaultDate={endDate}
-        onClose={() => setRecognizeModalOpen(false)}
-        onSuccess={() => {
-          loadMetaAndDash(startDate, endDate, department);
-          showToast('Recognition awarded and employee score updated!');
-        }}
-      />
+          <GiveRecognitionModal
+            isOpen={recognizeModalOpen}
+            employees={dashboard?.employeesRanked || []}
+            preselectedEmployeeId={recognizeEmpId}
+            defaultDate={endDate}
+            onClose={() => setRecognizeModalOpen(false)}
+            onSuccess={() => {
+              loadMetaAndDash(startDate, endDate, department);
+              showToast('Recognition awarded and employee score updated!');
+            }}
+          />
+        </>
+      )}
 
       {toastMsg && (
         <div className="toast" role="status">
