@@ -103,6 +103,7 @@ export default function LoginPage({ onLoginSuccess }) {
 
   return (
     <div className="login-gateway-shell">
+      <div className="login-bg-overlay" aria-hidden="true" />
       <div className="login-gateway-card" style={{ maxWidth: 440 }}>
         {/* Brand Header */}
         <div className="login-gateway-header" style={{ padding: '32px 32px 24px' }}>
