@@ -3,21 +3,16 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock,
-  CreditCard,
-  DollarSign,
   Download,
-  ExternalLink,
   FileText,
   LogOut,
   Minus,
   Percent,
   Plus,
   Printer,
-  QrCode,
   RefreshCw,
   Search,
   ShoppingBag,
-  Sparkles,
   Store,
   Tag,
   Trash2,
@@ -47,10 +42,13 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [staffSearchQuery, setStaffSearchQuery] = useState('');
+  const [isStaffDropdownOpen, setIsStaffDropdownOpen] = useState(false);
+  const staffSearchRef = useRef(null);
+
   const [cartItems, setCartItems] = useState([]);
   const [overallDiscountPct, setOverallDiscountPct] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState('UPI'); // 'Cash' | 'UPI' | 'Card'
-  const [cashTendered, setCashTendered] = useState('');
+  const [isPaymentDone, setIsPaymentDone] = useState(false);
 
   // Custom Item Drawer/Row
   const [customItemName, setCustomItemName] = useState('');
@@ -65,7 +63,22 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
   // Receipt Modal
   const [activeReceipt, setActiveReceipt] = useState(null);
   const receiptQrRef = useRef(null);
-  const upiQrRef = useRef(null);
+
+  // Close Staff dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (staffSearchRef.current && !staffSearchRef.current.contains(e.target)) {
+        setIsStaffDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Reset payment done state if cart items or discount changes
+  useEffect(() => {
+    setIsPaymentDone(false);
+  }, [cartItems, overallDiscountPct]);
 
   // Load Billing initial data (shop, staff, departments, catalog)
   useEffect(() => {
@@ -81,6 +94,7 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
         if (data.salesStaff?.length > 0) {
           const firstSales = data.salesStaff.find((s) => s.emp_code === 'STAFF01' || s.emp_code === 'RW002') || data.salesStaff[0];
           setSelectedStaffId(firstSales.id);
+          setStaffSearchQuery(firstSales.emp_code);
         }
       })
       .catch((err) => {
@@ -88,6 +102,18 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
       })
       .finally(() => setInitLoading(false));
   }, [showToast]);
+
+  // Matching Staff based on Staff ID or Name search
+  const matchingStaff = useMemo(() => {
+    if (!staffSearchQuery.trim()) return salesStaff;
+    const q = staffSearchQuery.trim().toLowerCase();
+    return salesStaff.filter(
+      (s) =>
+        s.emp_code.toLowerCase().includes(q) ||
+        s.full_name.toLowerCase().includes(q) ||
+        (s.department_name && s.department_name.toLowerCase().includes(q))
+    );
+  }, [salesStaff, staffSearchQuery]);
 
   // Filter Catalog
   const filteredCatalog = useMemo(() => {
@@ -197,34 +223,6 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
     showToast?.(`Added custom line: ${newItem.name}`);
   }
 
-  // 1-Click Quick Demo Invoice generator
-  function handlePopulateQuickTestBill() {
-    const demoCatalog = catalog[0] || {
-      id: 'cat_01',
-      name: 'Pure Kanjeevaram Bridal Silk Saree',
-      dept_code: 'SILK',
-      dept_name: 'Silk & Sarees',
-      price_inr: 18500,
-    };
-    const demoBlouse = catalog[3] || {
-      id: 'cat_04',
-      name: 'Tussar Handwoven Silk with Blouse',
-      dept_code: 'SILK',
-      dept_name: 'Silk & Sarees',
-      price_inr: 6400,
-    };
-
-    setCartItems([
-      { id: demoCatalog.id, name: demoCatalog.name, dept_code: demoCatalog.dept_code, dept_name: demoCatalog.dept_name, rate: demoCatalog.price_inr, qty: 1 },
-      { id: demoBlouse.id, name: demoBlouse.name, dept_code: demoBlouse.dept_code, dept_name: demoBlouse.dept_name, rate: demoBlouse.price_inr, qty: 1 },
-    ]);
-    setCustomerName('Ananya Sharma');
-    setCustomerPhone('9845012345');
-    setOverallDiscountPct(5);
-    setPaymentMethod('UPI');
-    showToast?.('⚡ Loaded Quick Test Bridal Silk Invoice (₹23,655)');
-  }
-
   // Clear current bill
   function handleClearBill() {
     if (cartItems.length > 0 && !window.confirm('Clear current invoice lines?')) return;
@@ -232,7 +230,7 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
     setCustomerName('');
     setCustomerPhone('');
     setOverallDiscountPct(0);
-    setCashTendered('');
+    setIsPaymentDone(false);
     setInvoiceNo(`INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
   }
 
@@ -243,7 +241,7 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
       return;
     }
     if (!selectedStaffId) {
-      showToast?.('Please assign the assisted sales staff for sales attribution.');
+      showToast?.('Please search and select the assisted sales staff for sales attribution.');
       return;
     }
 
@@ -270,7 +268,7 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
         discount_amount: discountAmount,
         tax_amount: gstAmount,
         net_amount: netTotalPayable,
-        payment_method: paymentMethod,
+        payment_method: 'Paid',
         sale_date: new Date().toISOString().slice(0, 10),
       };
 
@@ -291,7 +289,7 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
         setCustomerName('');
         setCustomerPhone('');
         setOverallDiscountPct(0);
-        setCashTendered('');
+        setIsPaymentDone(false);
         setInvoiceNo(`INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
       }
     } catch (err) {
@@ -301,24 +299,23 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
     }
   }
 
-  // Render UPI QR Code inside modal / drawer
-  useEffect(() => {
-    if (paymentMethod === 'UPI' && upiQrRef.current && netTotalPayable > 0) {
-      const upiUrl = `upi://pay?pa=kaveri.silks@icici&pn=Kaveri%20Silks%20Textiles&am=${netTotalPayable}&cu=INR&tn=${encodeURIComponent(invoiceNo)}`;
-      QRCode.toCanvas(upiQrRef.current, upiUrl, { width: 140, margin: 1 }, (e) => {
-        if (e) console.error(e);
-      });
-    }
-  }, [paymentMethod, netTotalPayable, invoiceNo]);
-
-  // Render Receipt QR code for customer feedback
+  // Render Receipt QR code for customer feedback (Placed exclusively on bill)
   useEffect(() => {
     if (activeReceipt && receiptQrRef.current) {
       const staffRef = activeReceipt.staffCode || activeReceipt.sales_emp_code || 'RW002';
       const feedbackUrl = `${window.location.origin}/feedback/${encodeURIComponent(staffRef)}`;
-      QRCode.toCanvas(receiptQrRef.current, feedbackUrl, { width: 100, margin: 1 }, (e) => {
-        if (e) console.error(e);
-      });
+      QRCode.toCanvas(
+        receiptQrRef.current,
+        feedbackUrl,
+        {
+          width: 120,
+          margin: 1,
+          color: { dark: '#1e1b4b', light: '#ffffff' },
+        },
+        (e) => {
+          if (e) console.error('Failed to generate receipt QR code', e);
+        }
+      );
     }
   }, [activeReceipt]);
 
@@ -349,16 +346,6 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={handlePopulateQuickTestBill}
-            title="1-click test invoice to test billing & sales staff credit"
-            style={{ background: '#fef3c7', color: '#92400e', borderColor: '#fde68a', fontWeight: 700 }}
-          >
-            <Sparkles size={14} color="#d97706" /> ⚡ Quick Test Invoice
-          </button>
-
           {/* Logged in Cashier Profile */}
           <div className="cashier-chip">
             <EmployeeAvatar employee={user} size={30} />
@@ -589,36 +576,180 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
               </button>
             </div>
 
-            {/* Sales Staff Attribution (Crucial for Rewardly!) */}
-            <div className="staff-attribution-box">
-              <label className="field-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {/* Sales Staff Attribution: Search & Fill by Staff ID or Name */}
+            <div className="staff-attribution-box" ref={staffSearchRef}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 700, color: '#1e1b4b' }}>
                   <Users size={14} color="#6d28d9" />
-                  <strong>Assisted Sales Staff</strong>
+                  <span>Assisted Sales Staff</span>
                 </span>
                 <span style={{ fontSize: 11, color: '#6d28d9', fontWeight: 600 }}>
                   ★ Credits Performance Score
                 </span>
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-                {assignedStaffObj && <EmployeeAvatar employee={assignedStaffObj} size={36} />}
-                <select
-                  className="select"
-                  value={selectedStaffId}
-                  onChange={(e) => setSelectedStaffId(e.target.value)}
-                  style={{ flex: 1, fontWeight: 600 }}
-                  required
+              </div>
+
+              {/* Staff ID Search & Auto-Fill Input */}
+              <div style={{ position: 'relative' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <Search size={15} color="#6d28d9" style={{ position: 'absolute', left: 10, pointerEvents: 'none' }} />
+                  <input
+                    type="text"
+                    className="input"
+                    value={staffSearchQuery}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setStaffSearchQuery(val);
+                      setIsStaffDropdownOpen(true);
+                      const exact = salesStaff.find(
+                        (s) => s.emp_code.toLowerCase() === val.trim().toLowerCase()
+                      );
+                      if (exact) {
+                        setSelectedStaffId(exact.id);
+                      }
+                    }}
+                    onFocus={() => setIsStaffDropdownOpen(true)}
+                    placeholder="Search Staff ID (e.g. RW002, STAFF01) or name..."
+                    style={{
+                      paddingLeft: 34,
+                      paddingRight: staffSearchQuery ? 30 : 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.02em',
+                      background: '#ffffff',
+                    }}
+                  />
+                  {staffSearchQuery && (
+                    <button
+                      type="button"
+                      className="link-btn"
+                      onClick={() => {
+                        setStaffSearchQuery('');
+                        setIsStaffDropdownOpen(true);
+                      }}
+                      style={{
+                        position: 'absolute',
+                        right: 8,
+                        color: '#94a3b8',
+                        padding: 3,
+                      }}
+                      title="Clear search"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Autocomplete suggestions dropdown */}
+                {isStaffDropdownOpen && matchingStaff.length > 0 && (
+                  <div
+                    className="card"
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      maxHeight: 220,
+                      overflowY: 'auto',
+                      zIndex: 40,
+                      marginTop: 4,
+                      padding: 4,
+                      boxShadow: '0 12px 28px rgba(15, 23, 42, 0.16)',
+                      border: '1px solid #ddd6fe',
+                      background: '#ffffff',
+                    }}
+                  >
+                    {matchingStaff.slice(0, 10).map((staff) => (
+                      <button
+                        key={staff.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedStaffId(staff.id);
+                          setStaffSearchQuery(staff.emp_code);
+                          setIsStaffDropdownOpen(false);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          width: '100%',
+                          padding: '8px 10px',
+                          border: 'none',
+                          background: selectedStaffId === staff.id ? '#f3e8ff' : 'transparent',
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'background 0.1s ease',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <EmployeeAvatar employee={staff} size={28} />
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b' }}>
+                              <span style={{ color: '#6d28d9', marginRight: 6 }}>{staff.emp_code}</span>
+                              {staff.full_name}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                              {staff.department_name || 'Showroom Floor'}
+                            </div>
+                          </div>
+                        </div>
+                        {selectedStaffId === staff.id && (
+                          <span style={{ fontSize: 11, color: '#059669', fontWeight: 700 }}>
+                            ✓ Selected
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected Staff Member Banner */}
+              {assignedStaffObj ? (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 12px',
+                    background: '#ffffff',
+                    border: '1px solid #c4b5fd',
+                    borderRadius: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
                 >
-                  {salesStaff.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.emp_code} — {s.full_name} ({s.department_name})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                This bill's net sales will instantly increment this consultant's composite score and leaderboard rank.
-              </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <EmployeeAvatar employee={assignedStaffObj} size={34} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: '#1e1b4b' }}>
+                        {assignedStaffObj.full_name}
+                        <span
+                          style={{
+                            marginLeft: 8,
+                            background: '#ede9fe',
+                            color: '#6d28d9',
+                            padding: '2px 8px',
+                            borderRadius: 12,
+                            fontSize: 11,
+                            fontWeight: 800,
+                          }}
+                        >
+                          {assignedStaffObj.emp_code}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {assignedStaffObj.department_name || 'Showroom Floor'} • Assigned Consultant
+                      </div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 11, color: '#059669', fontWeight: 700 }}>
+                    ✓ Filled
+                  </span>
+                </div>
+              ) : (
+                <div style={{ marginTop: 6, fontSize: 11.5, color: '#dc2626' }}>
+                  ⚠️ Type or search a Staff ID to attribute this bill.
+                </div>
+              )}
             </div>
 
             {/* Customer Details Strip */}
@@ -655,7 +786,7 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
                     Invoice is empty
                   </p>
                   <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
-                    Click items in the catalog or use "⚡ Quick Test Invoice"
+                    Click items in the showroom catalog to add to invoice
                   </p>
                 </div>
               ) : (
@@ -756,90 +887,100 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
               </div>
             </div>
 
-            {/* Payment Method Selector */}
-            <div style={{ marginTop: 14 }}>
-              <label className="field-label" style={{ fontSize: 12, marginBottom: 8 }}>
-                Payment Method
-              </label>
-              <div className="payment-options-grid">
+            {/* Payment Confirmation & Bill Generation */}
+            <div style={{ marginTop: 16 }}>
+              {!isPaymentDone ? (
                 <button
                   type="button"
-                  className={`payment-option-btn ${paymentMethod === 'UPI' ? 'active' : ''}`}
-                  onClick={() => setPaymentMethod('UPI')}
+                  className="btn btn-success"
+                  disabled={cartItems.length === 0}
+                  onClick={() => {
+                    if (cartItems.length === 0) {
+                      showToast?.('Please add items to bill before confirming payment.');
+                      return;
+                    }
+                    if (!selectedStaffId) {
+                      showToast?.('Please search and fill the assisted sales staff ID first.');
+                      return;
+                    }
+                    setIsPaymentDone(true);
+                    showToast?.('Payment confirmed! Click "Generate Bill" to create tax invoice.');
+                  }}
+                  style={{
+                    width: '100%',
+                    justifyContent: 'center',
+                    padding: '14px 20px',
+                    fontSize: 16,
+                    fontWeight: 800,
+                    borderRadius: 14,
+                    background: '#059669',
+                    color: '#ffffff',
+                    border: 'none',
+                    boxShadow: '0 6px 18px rgba(5, 150, 105, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    cursor: cartItems.length === 0 ? 'not-allowed' : 'pointer',
+                    opacity: cartItems.length === 0 ? 0.6 : 1,
+                  }}
                 >
-                  <QrCode size={16} />
-                  <span>UPI / QR</span>
+                  <CheckCircle2 size={18} />
+                  Payment Done ({formatInr(netTotalPayable)})
                 </button>
-                <button
-                  type="button"
-                  className={`payment-option-btn ${paymentMethod === 'Cash' ? 'active' : ''}`}
-                  onClick={() => setPaymentMethod('Cash')}
-                >
-                  <DollarSign size={16} />
-                  <span>Cash</span>
-                </button>
-                <button
-                  type="button"
-                  className={`payment-option-btn ${paymentMethod === 'Card' ? 'active' : ''}`}
-                  onClick={() => setPaymentMethod('Card')}
-                >
-                  <CreditCard size={16} />
-                  <span>POS Card</span>
-                </button>
-              </div>
-
-              {/* UPI Live QR Drawer */}
-              {paymentMethod === 'UPI' && netTotalPayable > 0 && (
-                <div className="upi-preview-box">
-                  <canvas ref={upiQrRef} style={{ display: 'block', borderRadius: 8 }} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b' }}>
-                      Scan &amp; Pay via Any UPI App
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                      GPay, PhonePe, Paytm, BHIM • Amount: <strong>{formatInr(netTotalPayable)}</strong>
-                    </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 14px',
+                      background: '#ecfdf5',
+                      border: '1px solid #a7f3d0',
+                      borderRadius: 10,
+                      fontSize: 13,
+                      color: '#065f46',
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                      <CheckCircle2 size={16} color="#059669" />
+                      Payment Received ({formatInr(netTotalPayable)})
+                    </span>
+                    <button
+                      type="button"
+                      className="link-btn"
+                      onClick={() => setIsPaymentDone(false)}
+                      style={{ fontSize: 12, color: '#047857', fontWeight: 600 }}
+                    >
+                      Undo
+                    </button>
                   </div>
-                </div>
-              )}
 
-              {/* Cash tendered calculator */}
-              {paymentMethod === 'Cash' && netTotalPayable > 0 && (
-                <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
-                  <div style={{ flex: 1 }}>
-                    <label className="field-label" style={{ fontSize: 11 }}>Cash Received (₹)</label>
-                    <input
-                      type="number"
-                      className="input"
-                      placeholder="e.g. 25000"
-                      value={cashTendered}
-                      onChange={(e) => setCashTendered(e.target.value)}
-                    />
-                  </div>
-                  {Number(cashTendered) > netTotalPayable && (
-                    <div style={{ flex: 1, padding: '8px 12px', background: '#ecfdf5', borderRadius: 8, fontSize: 12 }}>
-                      <div style={{ color: '#065f46', fontWeight: 600 }}>Change Due:</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#059669' }}>
-                        {formatInr(Number(cashTendered) - netTotalPayable)}
-                      </div>
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={submittingBill}
+                    onClick={handleCheckoutInvoice}
+                    style={{
+                      width: '100%',
+                      justifyContent: 'center',
+                      padding: '14px 20px',
+                      fontSize: 16,
+                      fontWeight: 800,
+                      borderRadius: 14,
+                      background: 'linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%)',
+                      boxShadow: '0 8px 24px rgba(109, 40, 217, 0.35)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <FileText size={18} />
+                    {submittingBill ? 'Generating Bill...' : `Generate Bill (${formatInr(netTotalPayable)})`}
+                  </button>
                 </div>
               )}
             </div>
-
-            {/* Complete Bill CTA */}
-            <button
-              type="button"
-              className="btn btn-primary billing-complete-btn"
-              disabled={cartItems.length === 0 || submittingBill}
-              onClick={handleCheckoutInvoice}
-            >
-              <CheckCircle2 size={18} />
-              {submittingBill
-                ? 'Processing & Crediting Sales Staff...'
-                : `Complete Bill (${formatInr(netTotalPayable)})`}
-            </button>
           </div>
         </div>
       </div>
@@ -948,8 +1089,8 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
                   <span>₹{Number(activeReceipt.net_amount).toLocaleString('en-IN')}</span>
                 </div>
                 <div className="receipt-calc-line" style={{ marginTop: 4 }}>
-                  <span>Payment Mode:</span>
-                  <strong>{activeReceipt.payment_method}</strong>
+                  <span>Payment Status:</span>
+                  <strong style={{ color: '#059669' }}>PAID</strong>
                 </div>
               </div>
 
@@ -958,11 +1099,14 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
               {/* Customer QR feedback on receipt */}
               <div className="receipt-footer-feedback">
                 <canvas ref={receiptQrRef} style={{ display: 'block', margin: '0 auto 8px' }} />
-                <div style={{ fontWeight: 700, fontSize: 12 }}>
+                <div style={{ fontWeight: 800, fontSize: 13, color: '#1e1b4b' }}>
                   Rate Consultant {activeReceipt.staffName}
                 </div>
-                <div style={{ fontSize: 11, color: '#555' }}>
-                  Scan QR with any phone camera to share your showroom shopping feedback!
+                <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
+                  Scan QR with any phone camera to provide direct shopping feedback!
+                </div>
+                <div style={{ fontSize: 10.5, color: '#6d28d9', marginTop: 2, fontWeight: 700 }}>
+                  Staff ID: {activeReceipt.staffCode || activeReceipt.sales_emp_code || 'Staff'}
                 </div>
               </div>
 
