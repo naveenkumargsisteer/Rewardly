@@ -6,9 +6,7 @@ import {
   CheckCircle2,
   Clock,
   Download,
-  ExternalLink,
   KeyRound,
-  LogOut,
   Mail,
   Phone,
   QrCode,
@@ -375,78 +373,6 @@ export default function EmployeePortalPage({
             )}
           </div>
         </div>
-
-        {/* Action Controls */}
-        <div className="emp-portal-actions">
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingAvatar}
-            style={{
-              background: 'rgba(255, 255, 255, 0.15)',
-              color: '#ffffff',
-              borderColor: 'rgba(255, 255, 255, 0.3)',
-            }}
-          >
-            <Camera size={14} />
-            {uploadingAvatar ? 'Compressing...' : 'Change Photo'}
-          </button>
-
-          {(employee?.avatar_url || employee?.avatar_color?.startsWith('data:image/')) && (
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={handleRemoveAvatar}
-              disabled={uploadingAvatar}
-              style={{
-                background: 'rgba(239, 68, 68, 0.2)',
-                color: '#fee2e2',
-                borderColor: 'rgba(239, 68, 68, 0.4)',
-              }}
-              title="Remove profile picture"
-            >
-              <Trash2 size={13} />
-            </button>
-          )}
-
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => setShowPasswordModal(true)}
-            style={{
-              background: 'rgba(255, 255, 255, 0.15)',
-              color: '#ffffff',
-              borderColor: 'rgba(255, 255, 255, 0.3)',
-            }}
-          >
-            <KeyRound size={14} />
-            Change Password
-          </button>
-
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={onSwitchToManager}
-            style={{
-              background: '#ffffff',
-              color: '#6d28d9',
-              fontWeight: 700,
-            }}
-          >
-            Manager Dashboard
-          </button>
-
-          <button
-            type="button"
-            className="btn btn-danger btn-sm"
-            onClick={onLogout}
-            title="Log out"
-          >
-            <LogOut size={14} />
-            Logout
-          </button>
-        </div>
       </div>
 
       {/* Main Grid */}
@@ -560,15 +486,6 @@ export default function EmployeePortalPage({
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
                 Recent Customer Feedback ({feedbackList.length})
               </h3>
-              <a
-                href={feedbackUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="link-btn"
-                style={{ fontSize: 12 }}
-              >
-                Preview Mobile Form <ExternalLink size={12} />
-              </a>
             </div>
 
             {loadingDetail ? (
@@ -725,16 +642,6 @@ export default function EmployeePortalPage({
               >
                 <Download size={15} /> Download Printable QR Standee (PNG)
               </button>
-
-              <a
-                href={feedbackUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-secondary"
-                style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }}
-              >
-                <ExternalLink size={14} /> Open Customer Feedback Page
-              </a>
             </div>
           </div>
 
@@ -761,6 +668,26 @@ export default function EmployeePortalPage({
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Photo Optimization</span>
                 <span style={{ color: '#10b981', fontWeight: 600 }}>≤ 15 KB WebP</span>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingTop: 8,
+                  marginTop: 2,
+                  borderTop: '1px solid var(--border)',
+                }}
+              >
+                <span style={{ color: 'var(--text-muted)' }}>Password</span>
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => setShowPasswordModal(true)}
+                  style={{ fontSize: 12.5 }}
+                >
+                  Change Password
+                </button>
               </div>
             </div>
           </div>
