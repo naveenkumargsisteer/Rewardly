@@ -327,60 +327,6 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
 
   return (
     <div className="billing-shell">
-      {/* Top POS Terminal Navigation Bar */}
-      <header className="billing-top-bar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div className="brand-logo" style={{ cursor: 'default' }}>
-            <img src="/rewardly-logo.png" alt="Rewardly" className="brand-logo-img" />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <h2 className="billing-title">Showroom POS &amp; Billing Counter</h2>
-              <span className="billing-badge">Terminal POS-KVR-01</span>
-              <span className="billing-status-dot">🟢 Online • Cloud Sync</span>
-            </div>
-            <div className="billing-sub">
-              Kaveri Silks &amp; Textiles Flagship • Counter #1 Main Silk Floor
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {/* Logged in Cashier Profile */}
-          <div className="cashier-chip">
-            <EmployeeAvatar employee={user} size={30} />
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.2 }}>
-                {user?.full_name || 'Harshvardhan Singh'}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                Cashier • {user?.emp_code || 'CASH01'}
-              </div>
-            </div>
-          </div>
-
-          {user?.role_category === 'admin' && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={onSwitchToManager}
-              title="Return to Manager Dashboard"
-            >
-              <Store size={14} /> Admin Dashboard
-            </button>
-          )}
-
-          <button
-            type="button"
-            className="btn btn-danger btn-sm"
-            onClick={onLogout}
-            title="Log Out of POS Terminal"
-          >
-            <LogOut size={14} /> Sign Out
-          </button>
-        </div>
-      </header>
-
       {/* Main POS Split Layout */}
       <div className="billing-main-grid">
         {/* LEFT COLUMN: Catalog, Fast Item Picker & Search */}
@@ -444,57 +390,6 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
                 </div>
               </div>
             ))}
-          </div>
-
-          {/* Custom Fabric Entry Strip */}
-          <div className="card" style={{ padding: '14px 16px', marginTop: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 13, fontWeight: 700 }}>
-              <Tag size={15} color="#6d28d9" />
-              <span>Custom Fabric / Unlisted Item Quick Entry</span>
-            </div>
-            <form onSubmit={handleAddCustomItem} className="custom-item-form">
-              <input
-                type="text"
-                className="input"
-                placeholder="Item / fabric description (e.g. Georgette cut 4.5m)"
-                value={customItemName}
-                onChange={(e) => setCustomItemName(e.target.value)}
-                style={{ flex: '2 1 200px' }}
-              />
-              <select
-                className="select"
-                value={customItemDept}
-                onChange={(e) => setCustomItemDept(e.target.value)}
-                style={{ flex: '1 1 120px' }}
-              >
-                {departments.map((d) => (
-                  <option key={d.id} value={d.code}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                className="input"
-                placeholder="Price (₹)"
-                value={customItemPrice}
-                onChange={(e) => setCustomItemPrice(e.target.value)}
-                style={{ flex: '1 1 100px' }}
-                min="1"
-              />
-              <input
-                type="number"
-                className="input"
-                placeholder="Qty"
-                value={customItemQty}
-                onChange={(e) => setCustomItemQty(e.target.value)}
-                style={{ width: 70 }}
-                min="1"
-              />
-              <button type="submit" className="btn btn-secondary btn-sm" style={{ whiteSpace: 'nowrap' }}>
-                <Plus size={14} /> Add Line
-              </button>
-            </form>
           </div>
 
           {/* Recent Bills Ledger */}
@@ -775,6 +670,106 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
                   onChange={(e) => setCustomerName(e.target.value)}
                 />
               </div>
+            </div>
+
+            {/* Quick Add Custom Fabric / Unlisted Item (Directly in Cart) */}
+            <div
+              style={{
+                marginTop: 12,
+                padding: '10px 12px',
+                background: '#f8fafc',
+                border: '1px dashed #cbd5e1',
+                borderRadius: 12,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 8,
+                }}
+              >
+                <span
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: '#1e1b4b',
+                  }}
+                >
+                  <Tag size={13} color="#6d28d9" />
+                  <span>Custom Fabric / Unlisted Item Entry</span>
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Direct Line Entry</span>
+              </div>
+
+              <form
+                onSubmit={handleAddCustomItem}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 6,
+                  alignItems: 'center',
+                }}
+              >
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Item / fabric description (e.g. Silk cut 4.5m)"
+                  value={customItemName}
+                  onChange={(e) => setCustomItemName(e.target.value)}
+                  style={{ flex: '2 1 150px', fontSize: 12, padding: '6px 10px' }}
+                />
+                <select
+                  className="select"
+                  value={customItemDept}
+                  onChange={(e) => setCustomItemDept(e.target.value)}
+                  style={{ flex: '1.2 1 110px', fontSize: 12, padding: '6px 8px' }}
+                >
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.code}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  className="input"
+                  placeholder="Rate (₹)"
+                  value={customItemPrice}
+                  onChange={(e) => setCustomItemPrice(e.target.value)}
+                  style={{ flex: '1 1 80px', fontSize: 12, padding: '6px 8px' }}
+                  min="1"
+                />
+                <input
+                  type="number"
+                  className="input"
+                  placeholder="Qty"
+                  value={customItemQty}
+                  onChange={(e) => setCustomItemQty(e.target.value)}
+                  style={{ width: 56, fontSize: 12, padding: '6px 4px', textAlign: 'center' }}
+                  min="1"
+                />
+                <button
+                  type="submit"
+                  className="btn btn-secondary btn-sm"
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    background: '#ede9fe',
+                    color: '#6d28d9',
+                    borderColor: '#ddd6fe',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title="Add custom line to bill"
+                >
+                  <Plus size={13} /> Add Line
+                </button>
+              </form>
             </div>
 
             {/* Cart Line Items */}

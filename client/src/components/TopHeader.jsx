@@ -77,6 +77,21 @@ export default function TopHeader({
           <h1 className="brand-title">
             {headerTitle}
             <span className="brand-badge">{shop?.name || 'Kaveri Silks & Textiles'}</span>
+            {activePage === 'billing' && (
+              <span
+                style={{
+                  marginLeft: 8,
+                  background: '#ede9fe',
+                  color: '#6d28d9',
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                POS-KVR-01 • Counter #1
+              </span>
+            )}
           </h1>
           <p className="brand-subtitle">
             {shop?.tagline || 'AI-Powered Employee Performance, Loyalty & Recognition'}
