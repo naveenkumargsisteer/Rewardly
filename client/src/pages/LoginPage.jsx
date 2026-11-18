@@ -160,7 +160,7 @@ export default function LoginPage({ onLoginSuccess }) {
                   className="input"
                   value={empCode}
                   onChange={(e) => setEmpCode(e.target.value)}
-                  placeholder="e.g. RW002 or ADMIN01"
+                  placeholder="Enter your Employee ID"
                   autoFocus
                   required
                   style={{

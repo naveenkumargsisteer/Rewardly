@@ -2621,6 +2621,39 @@ button, input, select, textarea {
   color: #ffffff;
 }
 
+.catalog-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.catalog-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.catalog-action-btn.edit-btn:hover {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+
+.catalog-action-btn.delete-btn:hover {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
 .custom-item-form {
   display: flex;
   gap: 8px;

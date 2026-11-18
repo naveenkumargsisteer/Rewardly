@@ -7,6 +7,7 @@ import {
   FileText,
   LogOut,
   Minus,
+  Pencil,
   Percent,
   Plus,
   Printer,
@@ -50,11 +51,23 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
   const [overallDiscountPct, setOverallDiscountPct] = useState(0);
   const [isPaymentDone, setIsPaymentDone] = useState(false);
 
-  // Custom Item Drawer/Row
+  // Custom Item Drawer / Direct Line Entry
   const [customItemName, setCustomItemName] = useState('');
   const [customItemDept, setCustomItemDept] = useState('SILK');
   const [customItemPrice, setCustomItemPrice] = useState('');
   const [customItemQty, setCustomItemQty] = useState(1);
+
+  // Edit Catalog Item & Edit Cart Line State
+  const [editingItem, setEditingItem] = useState(null);
+  const [editingCartItem, setEditingCartItem] = useState(null);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [newItemForm, setNewItemForm] = useState({
+    name: '',
+    dept_code: 'SILK',
+    price_inr: '',
+    sku: '',
+    addToCart: true,
+  });
 
   // Completed Invoices Ledger (Session)
   const [recentInvoices, setRecentInvoices] = useState([]);
@@ -63,6 +76,22 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
   // Receipt Modal
   const [activeReceipt, setActiveReceipt] = useState(null);
   const receiptQrRef = useRef(null);
+
+  // Helper to persist catalog changes to localStorage
+  function saveCatalog(nextCatalog) {
+    setCatalog(nextCatalog);
+    try {
+      localStorage.setItem('rewardly_pos_catalog', JSON.stringify(nextCatalog));
+    } catch {}
+  }
+
+  const isCatalogModified = useMemo(() => {
+    try {
+      return Boolean(localStorage.getItem('rewardly_pos_catalog'));
+    } catch {
+      return false;
+    }
+  }, [catalog]);
 
   // Close Staff dropdown on outside click
   useEffect(() => {
@@ -87,15 +116,23 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
       .getBillingInit()
       .then((data) => {
         setInitData(data);
-        setCatalog(data.catalog || []);
+        // Load custom persisted catalog if cashier added/edited items
+        let initialCatalog = data.catalog || [];
+        try {
+          const saved = localStorage.getItem('rewardly_pos_catalog');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              initialCatalog = parsed;
+            }
+          }
+        } catch {}
+        setCatalog(initialCatalog);
         setSalesStaff(data.salesStaff || []);
         setDepartments(data.departments || []);
-        // Pre-select first sales consultant
-        if (data.salesStaff?.length > 0) {
-          const firstSales = data.salesStaff.find((s) => s.emp_code === 'STAFF01' || s.emp_code === 'RW002') || data.salesStaff[0];
-          setSelectedStaffId(firstSales.id);
-          setStaffSearchQuery(firstSales.emp_code);
-        }
+        // Don't add staff by default - keep staff unassigned until cashier selects one
+        setSelectedStaffId('');
+        setStaffSearchQuery('');
       })
       .catch((err) => {
         showToast?.(err.message || 'Failed to initialize POS terminal.');
@@ -190,45 +227,205 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
     setCartItems((prev) => prev.filter((i) => i.id !== id));
   }
 
-  // Add custom line item
+  // Add custom line item (Adds to LEFT-SIDE catalog list AND to active bill invoice)
   function handleAddCustomItem(e) {
     e.preventDefault();
     if (!customItemName.trim()) {
-      showToast?.('Please enter item name.');
+      showToast?.('Please enter item / fabric description.');
       return;
     }
     const price = Number(customItemPrice);
     if (!price || price <= 0) {
-      showToast?.('Please enter a valid price.');
+      showToast?.('Please enter a valid price/rate.');
       return;
     }
 
     const deptObj = departments.find((d) => d.code === customItemDept) || {
-      name: 'Custom Fabric',
-      code: customItemDept,
+      name: 'Silk & Sarees',
+      code: customItemDept || 'SILK',
     };
-    const newItem = {
-      id: `custom_${Date.now()}`,
+    const qty = Math.max(1, Number(customItemQty) || 1);
+    const newId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const skuCode = `${deptObj.code || 'ITEM'}-${customItemName.trim().slice(0, 3).toUpperCase()}-${Math.floor(10 + Math.random() * 90)}`;
+
+    const newCatalogItem = {
+      id: newId,
       name: customItemName.trim(),
-      dept_code: customItemDept,
+      dept_code: deptObj.code,
       dept_name: deptObj.name,
-      rate: price,
-      qty: Math.max(1, Number(customItemQty) || 1),
+      price_inr: price,
+      sku: skuCode,
+      tax_pct: 5,
+      isCustom: true,
     };
 
-    setCartItems((prev) => [...prev, newItem]);
+    // 1. Add to LEFT-SIDE catalog list (persisted to localStorage)
+    const nextCatalog = [newCatalogItem, ...catalog];
+    saveCatalog(nextCatalog);
+
+    // 2. Add to active invoice cart
+    const newCartItem = {
+      id: newId,
+      name: newCatalogItem.name,
+      dept_code: deptObj.code,
+      dept_name: deptObj.name,
+      rate: price,
+      qty,
+      isCustom: true,
+    };
+    setCartItems((prev) => [...prev, newCartItem]);
+
     setCustomItemName('');
     setCustomItemPrice('');
     setCustomItemQty(1);
-    showToast?.(`Added custom line: ${newItem.name}`);
+    showToast?.(`Added "${newCatalogItem.name}" to Catalog (left side) & Invoice!`);
   }
 
-  // Clear current bill
+  // Create new item from Catalog "+ Add New Item" modal
+  function handleCreateCatalogItem(e) {
+    e.preventDefault();
+    if (!newItemForm.name.trim()) {
+      showToast?.('Item name is required.');
+      return;
+    }
+    const price = Math.max(1, Math.round(Number(newItemForm.price_inr) || 0));
+    const deptObj = departments.find((d) => d.code === newItemForm.dept_code) || {
+      name: 'Silk & Sarees',
+      code: 'SILK',
+    };
+    const newId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const skuCode = newItemForm.sku.trim() || `${deptObj.code}-${newItemForm.name.trim().slice(0, 3).toUpperCase()}-${Math.floor(10 + Math.random() * 90)}`;
+
+    const newCatalogItem = {
+      id: newId,
+      name: newItemForm.name.trim(),
+      dept_name: deptObj.name,
+      dept_code: deptObj.code,
+      price_inr: price,
+      sku: skuCode,
+      tax_pct: 5,
+    };
+
+    saveCatalog([newCatalogItem, ...catalog]);
+
+    if (newItemForm.addToCart) {
+      setCartItems((prev) => [
+        ...prev,
+        {
+          id: newId,
+          name: newCatalogItem.name,
+          dept_name: newCatalogItem.dept_name,
+          dept_code: newCatalogItem.dept_code,
+          rate: price,
+          qty: 1,
+        },
+      ]);
+    }
+
+    setShowAddItemModal(false);
+    setNewItemForm({
+      name: '',
+      dept_code: 'SILK',
+      price_inr: '',
+      sku: '',
+      addToCart: true,
+    });
+    showToast?.(`Added "${newCatalogItem.name}" to Showroom Catalog (left side)!`);
+  }
+
+  // Save changes to an existing catalog item
+  function handleSaveEditItem(e) {
+    e.preventDefault();
+    if (!editingItem?.name?.trim()) {
+      showToast?.('Item name is required.');
+      return;
+    }
+    const nextPrice = Math.max(1, Math.round(Number(editingItem.price_inr) || 0));
+    const deptObj = departments.find((d) => d.code === editingItem.dept_code) || {
+      name: editingItem.dept_name || 'Silk & Sarees',
+      code: editingItem.dept_code || 'SILK',
+    };
+
+    const updatedCatalog = catalog.map((it) => {
+      if (it.id === editingItem.id) {
+        return {
+          ...it,
+          name: editingItem.name.trim(),
+          price_inr: nextPrice,
+          dept_code: deptObj.code,
+          dept_name: deptObj.name,
+          sku: editingItem.sku?.trim() || it.sku,
+        };
+      }
+      return it;
+    });
+
+    saveCatalog(updatedCatalog);
+
+    // Also update line in active invoice cart if this item was already added
+    setCartItems((prev) =>
+      prev.map((ci) => {
+        if (ci.id === editingItem.id) {
+          return {
+            ...ci,
+            name: editingItem.name.trim(),
+            rate: nextPrice,
+            dept_name: deptObj.name,
+            dept_code: deptObj.code,
+          };
+        }
+        return ci;
+      })
+    );
+
+    setEditingItem(null);
+    showToast?.(`Updated "${editingItem.name.trim()}".`);
+  }
+
+  // Delete an item from the catalog list
+  function handleDeleteCatalogItem(e, item) {
+    e.stopPropagation();
+    if (!window.confirm(`Delete "${item.name}" from the showroom catalog list?`)) return;
+    const updatedCatalog = catalog.filter((it) => it.id !== item.id);
+    saveCatalog(updatedCatalog);
+    showToast?.(`Deleted "${item.name}" from catalog.`);
+  }
+
+  // Save changes to an active cart line item
+  function handleSaveEditCartItem(e) {
+    e.preventDefault();
+    if (!editingCartItem?.name?.trim()) return;
+    const nextRate = Math.max(1, Math.round(Number(editingCartItem.rate) || 0));
+    const nextQty = Math.max(1, Number(editingCartItem.qty) || 1);
+    setCartItems((prev) =>
+      prev.map((ci) =>
+        ci.id === editingCartItem.id
+          ? { ...ci, name: editingCartItem.name.trim(), rate: nextRate, qty: nextQty }
+          : ci
+      )
+    );
+    setEditingCartItem(null);
+    showToast?.('Updated cart item line.');
+  }
+
+  // Reset catalog back to standard defaults
+  function handleRestoreDefaultCatalog() {
+    if (!window.confirm('Reset catalog back to standard Kaveri Silks showroom defaults?')) return;
+    try {
+      localStorage.removeItem('rewardly_pos_catalog');
+    } catch {}
+    setCatalog(initData?.catalog || []);
+    showToast?.('Restored standard showroom catalog.');
+  }
+
+  // Clear current bill (resets cart, inputs, and keeps staff unselected)
   function handleClearBill() {
     if (cartItems.length > 0 && !window.confirm('Clear current invoice lines?')) return;
     setCartItems([]);
     setCustomerName('');
     setCustomerPhone('');
+    setSelectedStaffId('');
+    setStaffSearchQuery('');
     setOverallDiscountPct(0);
     setIsPaymentDone(false);
     setInvoiceNo(`INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -291,10 +488,12 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
           sgst: Math.round(gstAmount / 2),
         });
 
-        // Reset for next customer bill
+        // Reset for next customer bill (keep staff unselected by default)
         setCartItems([]);
         setCustomerName('');
         setCustomerPhone('');
+        setSelectedStaffId('');
+        setStaffSearchQuery('');
         setOverallDiscountPct(0);
         setIsPaymentDone(false);
         setInvoiceNo(`INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
@@ -341,63 +540,158 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
         <div className="billing-catalog-column">
           {/* Search & Filter Bar */}
           <div className="card" style={{ padding: '14px 16px', marginBottom: 14 }}>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', flex: '1 1 240px' }}>
-                <input
-                  type="text"
-                  className="input"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search saree, fabric, lehenga, sku, code..."
-                  style={{ paddingLeft: 36 }}
-                />
-                <Search
-                  size={16}
-                  color="#94a3b8"
-                  style={{ position: 'absolute', left: 12, top: 12, pointerEvents: 'none' }}
-                />
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flex: '1 1 320px', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', flex: '1 1 200px' }}>
+                  <input
+                    type="text"
+                    className="input"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search saree, fabric, lehenga, sku, code..."
+                    style={{ paddingLeft: 36 }}
+                  />
+                  <Search
+                    size={16}
+                    color="#94a3b8"
+                    style={{ position: 'absolute', left: 12, top: 12, pointerEvents: 'none' }}
+                  />
+                </div>
+
+                {/* Department filter pills */}
+                <div className="catalog-dept-pills">
+                  <button
+                    type="button"
+                    className={`dept-pill ${selectedDeptCode === 'all' ? 'active' : ''}`}
+                    onClick={() => setSelectedDeptCode('all')}
+                  >
+                    All ({catalog.length})
+                  </button>
+                  {departments.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      className={`dept-pill ${selectedDeptCode === d.code ? 'active' : ''}`}
+                      onClick={() => setSelectedDeptCode(d.code)}
+                    >
+                      {d.name}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Department filter pills */}
-              <div className="catalog-dept-pills">
+              {/* Action Buttons for Left Side Catalog */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button
                   type="button"
-                  className={`dept-pill ${selectedDeptCode === 'all' ? 'active' : ''}`}
-                  onClick={() => setSelectedDeptCode('all')}
+                  className="btn btn-primary btn-sm"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '7px 13px',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    whiteSpace: 'nowrap',
+                  }}
+                  onClick={() => setShowAddItemModal(true)}
+                  title="Add new article or fabric line to catalog"
                 >
-                  All ({catalog.length})
+                  <Plus size={14} /> Add New Item
                 </button>
-                {departments.map((d) => (
+
+                {isCatalogModified && (
                   <button
-                    key={d.id}
                     type="button"
-                    className={`dept-pill ${selectedDeptCode === d.code ? 'active' : ''}`}
-                    onClick={() => setSelectedDeptCode(d.code)}
+                    className="btn btn-secondary btn-sm"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '7px 10px',
+                      fontSize: 11.5,
+                      color: 'var(--text-muted)',
+                      whiteSpace: 'nowrap',
+                    }}
+                    onClick={handleRestoreDefaultCatalog}
+                    title="Reset catalog items back to showroom defaults"
                   >
-                    {d.name}
+                    <RefreshCw size={12} /> Reset
                   </button>
-                ))}
+                )}
               </div>
             </div>
           </div>
 
           {/* Product Catalog Grid */}
           <div className="catalog-grid">
-            {filteredCatalog.map((item) => (
-              <div key={item.id} className="catalog-card" onClick={() => handleAddToCart(item)}>
-                <div className="catalog-card-header">
-                  <span className="catalog-sku">{item.sku}</span>
-                  <span className="catalog-dept-badge">{item.dept_name}</span>
-                </div>
-                <h4 className="catalog-name">{item.name}</h4>
-                <div className="catalog-bottom">
-                  <div className="catalog-price">{formatInr(item.price_inr)}</div>
-                  <button type="button" className="catalog-add-btn">
-                    <Plus size={14} /> Add
-                  </button>
-                </div>
+            {filteredCatalog.length === 0 ? (
+              <div
+                className="card"
+                style={{
+                  gridColumn: '1 / -1',
+                  padding: 32,
+                  textAlign: 'center',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <Tag size={32} color="#cbd5e1" style={{ marginBottom: 8 }} />
+                <p style={{ fontWeight: 600, margin: '4px 0' }}>No items found in catalog</p>
+                <p style={{ fontSize: 12, margin: '4px 0 14px' }}>
+                  {searchQuery ? `No items matching "${searchQuery}"` : 'Your showroom catalog is empty.'}
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setShowAddItemModal(true)}
+                >
+                  <Plus size={13} /> Add New Item to Catalog
+                </button>
               </div>
-            ))}
+            ) : (
+              filteredCatalog.map((item) => (
+                <div key={item.id} className="catalog-card" onClick={() => handleAddToCart(item)}>
+                  <div className="catalog-card-header">
+                    <span className="catalog-sku">{item.sku}</span>
+                    <span className="catalog-dept-badge">{item.dept_name}</span>
+                  </div>
+                  <h4 className="catalog-name">{item.name}</h4>
+                  <div className="catalog-bottom">
+                    <div className="catalog-price">{formatInr(item.price_inr)}</div>
+                    <div className="catalog-actions-group">
+                      <button
+                        type="button"
+                        className="catalog-action-btn edit-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingItem({ ...item });
+                        }}
+                        title={`Edit "${item.name}"`}
+                        aria-label="Edit item"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        className="catalog-action-btn delete-btn"
+                        onClick={(e) => handleDeleteCatalogItem(e, item)}
+                        title={`Delete "${item.name}"`}
+                        aria-label="Delete item"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        className="catalog-add-btn"
+                        title="Add item to bill"
+                      >
+                        <Plus size={14} /> Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Recent Bills Ledger */}
@@ -508,6 +802,8 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
                       );
                       if (exact) {
                         setSelectedStaffId(exact.id);
+                      } else if (!val.trim()) {
+                        setSelectedStaffId('');
                       }
                     }}
                     onFocus={() => setIsStaffDropdownOpen(true)}
@@ -526,6 +822,7 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
                       className="link-btn"
                       onClick={() => {
                         setStaffSearchQuery('');
+                        setSelectedStaffId('');
                         setIsStaffDropdownOpen(true);
                       }}
                       style={{
@@ -829,14 +1126,25 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
                         {formatInr(item.rate * item.qty)}
                       </div>
 
-                      <button
-                        type="button"
-                        className="cart-remove-btn"
-                        onClick={() => handleRemoveItem(item.id)}
-                        aria-label="Remove item"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <button
+                          type="button"
+                          className="catalog-action-btn edit-btn"
+                          onClick={() => setEditingCartItem({ ...item })}
+                          title="Edit line item name or rate"
+                          aria-label="Edit item"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          className="cart-remove-btn"
+                          onClick={() => handleRemoveItem(item.id)}
+                          aria-label="Remove item"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1119,6 +1427,317 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
                 Powered by Rewardly Showroom Retail AI
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Catalog Item Modal */}
+      {editingItem && (
+        <div className="modal-backdrop" onClick={() => setEditingItem(null)}>
+          <div
+            className="card"
+            style={{
+              maxWidth: 480,
+              width: '100%',
+              padding: 24,
+              borderRadius: 20,
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.25)',
+              background: '#ffffff',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Pencil size={18} color="#6d28d9" />
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#1e1b4b' }}>
+                  Edit Showroom Item
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => setEditingItem(null)}
+                style={{ padding: 4, color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditItem}>
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="field-label" style={{ fontSize: 11.5 }}>Item / Fabric Description</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={editingItem.name}
+                  onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                  placeholder="e.g. Pure Kanjeevaram Silk Saree"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="field-label" style={{ fontSize: 11.5 }}>Department / Category</label>
+                <select
+                  className="select"
+                  value={editingItem.dept_code}
+                  onChange={(e) => setEditingItem({ ...editingItem, dept_code: e.target.value })}
+                >
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.code}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
+                <div className="form-group">
+                  <label className="field-label" style={{ fontSize: 11.5 }}>Price / Rate (₹)</label>
+                  <input
+                    type="number"
+                    className="input"
+                    value={editingItem.price_inr}
+                    onChange={(e) => setEditingItem({ ...editingItem, price_inr: e.target.value })}
+                    min="1"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="field-label" style={{ fontSize: 11.5 }}>SKU / Article Code</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={editingItem.sku || ''}
+                    onChange={(e) => setEditingItem({ ...editingItem, sku: e.target.value })}
+                    placeholder="e.g. SILK-KAN-01"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setEditingItem(null)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Item to Catalog Modal */}
+      {showAddItemModal && (
+        <div className="modal-backdrop" onClick={() => setShowAddItemModal(false)}>
+          <div
+            className="card"
+            style={{
+              maxWidth: 480,
+              width: '100%',
+              padding: 24,
+              borderRadius: 20,
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.25)',
+              background: '#ffffff',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Plus size={18} color="#6d28d9" />
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#1e1b4b' }}>
+                  Add New Item to Catalog
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => setShowAddItemModal(false)}
+                style={{ padding: 4, color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCatalogItem}>
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="field-label" style={{ fontSize: 11.5 }}>Item / Fabric Description</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={newItemForm.name}
+                  onChange={(e) => setNewItemForm({ ...newItemForm, name: e.target.value })}
+                  placeholder="e.g. Uppada Silk Jamdani Saree"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="field-label" style={{ fontSize: 11.5 }}>Department / Category</label>
+                <select
+                  className="select"
+                  value={newItemForm.dept_code}
+                  onChange={(e) => setNewItemForm({ ...newItemForm, dept_code: e.target.value })}
+                >
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.code}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                <div className="form-group">
+                  <label className="field-label" style={{ fontSize: 11.5 }}>Price / Rate (₹)</label>
+                  <input
+                    type="number"
+                    className="input"
+                    value={newItemForm.price_inr}
+                    onChange={(e) => setNewItemForm({ ...newItemForm, price_inr: e.target.value })}
+                    placeholder="e.g. 15000"
+                    min="1"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="field-label" style={{ fontSize: 11.5 }}>SKU (Optional)</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={newItemForm.sku}
+                    onChange={(e) => setNewItemForm({ ...newItemForm, sku: e.target.value })}
+                    placeholder="Auto-generated if blank"
+                  />
+                </div>
+              </div>
+
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 12.5,
+                  cursor: 'pointer',
+                  marginBottom: 18,
+                  color: '#475569',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={newItemForm.addToCart}
+                  onChange={(e) => setNewItemForm({ ...newItemForm, addToCart: e.target.checked })}
+                />
+                <span>Also add to active invoice right away</span>
+              </label>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowAddItemModal(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  <Plus size={14} /> Add to Catalog
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Invoice Line Item Modal */}
+      {editingCartItem && (
+        <div className="modal-backdrop" onClick={() => setEditingCartItem(null)}>
+          <div
+            className="card"
+            style={{
+              maxWidth: 420,
+              width: '100%',
+              padding: 24,
+              borderRadius: 20,
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.25)',
+              background: '#ffffff',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Pencil size={17} color="#6d28d9" />
+                <h3 style={{ margin: 0, fontSize: 15.5, fontWeight: 800, color: '#1e1b4b' }}>
+                  Edit Invoice Line Item
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => setEditingCartItem(null)}
+                style={{ padding: 4, color: '#64748b' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditCartItem}>
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="field-label" style={{ fontSize: 11.5 }}>Description</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={editingCartItem.name}
+                  onChange={(e) => setEditingCartItem({ ...editingCartItem, name: e.target.value })}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
+                <div className="form-group">
+                  <label className="field-label" style={{ fontSize: 11.5 }}>Unit Rate (₹)</label>
+                  <input
+                    type="number"
+                    className="input"
+                    value={editingCartItem.rate}
+                    onChange={(e) => setEditingCartItem({ ...editingCartItem, rate: e.target.value })}
+                    min="1"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="field-label" style={{ fontSize: 11.5 }}>Quantity</label>
+                  <input
+                    type="number"
+                    className="input"
+                    value={editingCartItem.qty}
+                    onChange={(e) => setEditingCartItem({ ...editingCartItem, qty: e.target.value })}
+                    min="1"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setEditingCartItem(null)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Update Line
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
