@@ -13,6 +13,7 @@ import {
   Star,
   Target,
   Trash2,
+  TrendingDown,
   TrendingUp,
   User,
   Users,
@@ -156,6 +157,23 @@ export default function EmployeePortalPage({
   const metrics = detail?.employee?.metrics || {};
   const recognitions = detail?.recentRecognitions || [];
   const feedbackList = detail?.recentFeedback || [];
+  const monthlyProgression = detail?.monthlyProgression || [];
+
+  // Month-over-Month Improvement Calculation
+  const lastIndex = monthlyProgression.length - 1;
+  const currentMonthData = lastIndex >= 0 ? monthlyProgression[lastIndex] : null;
+  const previousMonthData = lastIndex >= 1 ? monthlyProgression[lastIndex - 1] : null;
+  const currentScore =
+    currentMonthData != null
+      ? Number(currentMonthData.compositeScore || 0)
+      : Number(scores.compositeScore || 0);
+  const prevScore =
+    previousMonthData != null
+      ? Number(previousMonthData.compositeScore || 0)
+      : currentScore;
+  const scoreDelta = Math.round((currentScore - prevScore) * 10) / 10;
+  const isImproved = scoreDelta > 0;
+  const isDeclined = scoreDelta < 0;
 
   return (
     <div className="page-container" style={{ maxWidth: 1200, paddingBottom: 60 }}>
@@ -252,14 +270,8 @@ export default function EmployeePortalPage({
       <div className="emp-portal-grid">
         {/* Left Column: Metrics & Feedback */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Key Metric Tiles */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: 14,
-            }}
-          >
+          {/* Key Metric Tiles & Month-Wise Improvement Analytics */}
+          <div className="emp-kpi-grid">
             <div className="card" style={{ padding: 18 }}>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
                 Composite Score
@@ -326,22 +338,199 @@ export default function EmployeePortalPage({
               </div>
             </div>
 
-            <div className="card" style={{ padding: 18 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-                Attendance &amp; Punctuality
-              </div>
-              <div
-                style={{
-                  fontSize: 24,
-                  fontWeight: 800,
-                  color: '#10b981',
-                  margin: '6px 0 2px',
-                }}
-              >
-                {scores.attendanceScore != null ? `${scores.attendanceScore}%` : '98%'}
+            <div
+              className="card"
+              style={{
+                padding: 18,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
+                  Attendance &amp; Punctuality
+                </div>
+                <div
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 800,
+                    color: '#10b981',
+                    margin: '6px 0 2px',
+                  }}
+                >
+                  {scores.attendanceScore != null ? `${scores.attendanceScore}%` : '98%'}
+                </div>
               </div>
               <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                {metrics.attendanceDaysPresent ?? 92} / {metrics.attendanceDaysExpected ?? 94} days present
+                {metrics.attendanceDaysPresent ?? 92} / {metrics.attendanceDaysExpected ?? 94} days
+                present
+              </div>
+            </div>
+
+            {/* Month-Wise Improvement Analytics (Spanning columns 2 & 3 per user request) */}
+            <div className="card emp-kpi-improvement-card">
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  marginBottom: 6,
+                  flexWrap: 'wrap',
+                  gap: 6,
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--text-muted)',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <TrendingUp size={14} color="#6d28d9" />
+                    Month-Wise Improvement Analytics
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 3 }}>
+                    <span
+                      style={{
+                        fontSize: 22,
+                        fontWeight: 800,
+                        color: isImproved ? '#10b981' : isDeclined ? '#f59e0b' : '#6d28d9',
+                      }}
+                    >
+                      {isImproved ? `+${scoreDelta}%` : `${scoreDelta}%`}
+                    </span>
+                    <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                      {previousMonthData
+                        ? `MoM vs ${previousMonthData.label} (${prevScore}%)`
+                        : 'Tracking showroom trajectory'}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '3px 8px',
+                      borderRadius: 12,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      background: isImproved ? '#ecfdf5' : isDeclined ? '#fffbeb' : '#f5f3ff',
+                      color: isImproved ? '#065f46' : isDeclined ? '#b45309' : '#6d28d9',
+                    }}
+                  >
+                    {isImproved ? (
+                      <>
+                        <TrendingUp size={12} /> Upward Trend
+                      </>
+                    ) : isDeclined ? (
+                      <>
+                        <TrendingDown size={12} /> Needs Focus
+                      </>
+                    ) : (
+                      '⚖️ Stable Pace'
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Monthly Progression Micro Bars */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${Math.max(monthlyProgression.length, 1)}, 1fr)`,
+                  gap: 8,
+                  alignItems: 'end',
+                  paddingTop: 6,
+                  borderTop: '1px solid var(--border)',
+                  marginTop: 4,
+                }}
+              >
+                {monthlyProgression.map((m, idx) => {
+                  const isCurrent = idx === monthlyProgression.length - 1;
+                  const score = Number(m.compositeScore || 0);
+                  const barHeight = Math.max(10, Math.round((score / 100) * 36));
+
+                  return (
+                    <div
+                      key={m.monthKey || idx}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 3,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 10.5,
+                          fontWeight: isCurrent ? 800 : 600,
+                          color: isCurrent ? '#6d28d9' : 'var(--text-muted)',
+                        }}
+                      >
+                        {score > 0 ? `${Math.round(score)}%` : '—'}
+                      </span>
+
+                      {/* Bar Track & Fill */}
+                      <div
+                        style={{
+                          width: '100%',
+                          maxWidth: 32,
+                          height: 36,
+                          background: isCurrent ? '#ede9fe' : '#f1f5f9',
+                          borderRadius: 6,
+                          display: 'flex',
+                          alignItems: 'flex-end',
+                          overflow: 'hidden',
+                        }}
+                        title={`${m.label}: ${score}% composite score • ₹${(m.netSalesInr || 0).toLocaleString('en-IN')} net sales`}
+                      >
+                        <div
+                          style={{
+                            width: '100%',
+                            height: `${barHeight}px`,
+                            background: isCurrent
+                              ? 'linear-gradient(180deg, #7c3aed, #4c1d95)'
+                              : '#cbd5e1',
+                            borderRadius: 6,
+                            transition: 'height 0.4s ease',
+                          }}
+                        />
+                      </div>
+
+                      <div style={{ textAlign: 'center' }}>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: isCurrent ? 700 : 500,
+                            color: isCurrent ? '#1e1b4b' : 'var(--text-muted)',
+                          }}
+                        >
+                          {m.label}
+                        </span>
+                        <div
+                          style={{
+                            fontSize: 9.5,
+                            color: isCurrent && m.netSalesInr > 0 ? '#059669' : 'var(--text-muted)',
+                            fontWeight: isCurrent && m.netSalesInr > 0 ? 700 : 400,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {m.netSalesInr > 0
+                            ? `₹${Math.round(m.netSalesInr / 1000)}k`
+                            : '₹0'}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

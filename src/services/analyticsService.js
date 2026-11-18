@@ -449,7 +449,11 @@ async function getEmployeeDetail(employeeId, { startDate, endDate } = {}) {
       monthKey: b.monthKey,
       compositeScore: scored?.scores.compositeScore || 0,
       netSalesInr: scored?.metrics.netSalesInr || 0,
+      salesScore: scored?.scores.salesScore || 0,
       attendanceScore: scored?.scores.attendanceScore || 0,
+      feedbackScore: scored?.scores.feedbackScore || 0,
+      customerRating: scored?.metrics.avgCustomerRating || 0,
+      tier: scored?.scores.tier || 'Silver',
     };
   });
 

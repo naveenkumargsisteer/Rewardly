@@ -2186,19 +2186,36 @@ button, input, select, textarea {
   }
 }
 
-.emp-qr-card {
-  text-align: center;
-  padding: 24px;
+.emp-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
 }
 
-.emp-qr-box {
-  display: inline-flex;
-  padding: 12px;
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
-  border: 1px solid var(--border);
-  margin: 12px 0 16px;
+.emp-kpi-improvement-card {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 18px;
+}
+
+@media (max-width: 900px) {
+  .emp-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .emp-kpi-improvement-card {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 600px) {
+  .emp-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .emp-kpi-improvement-card {
+    grid-column: span 1;
+  }
 }
 
 /* ============================================================
