@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Line } from 'react-chartjs-2';
+import '../components/chartSetup';
 import {
   Award,
   Calendar,
@@ -159,21 +161,124 @@ export default function EmployeePortalPage({
   const feedbackList = detail?.recentFeedback || [];
   const monthlyProgression = detail?.monthlyProgression || [];
 
-  // Month-over-Month Improvement Calculation
+  // Month-over-Month Improvement & Line Chart Data
+  const [trendMetric, setTrendMetric] = useState('score'); // 'score' | 'sales'
+  const isScoreMode = trendMetric === 'score';
+
+  const chartLabels = monthlyProgression.map((m) => m.label || m.shortLabel);
+  const chartScoreValues = monthlyProgression.map((m) => Number(m.compositeScore || 0));
+  const chartSalesValues = monthlyProgression.map((m) => Number(m.netSalesInr || 0));
+  const chartActiveValues = isScoreMode ? chartScoreValues : chartSalesValues;
+
   const lastIndex = monthlyProgression.length - 1;
-  const currentMonthData = lastIndex >= 0 ? monthlyProgression[lastIndex] : null;
   const previousMonthData = lastIndex >= 1 ? monthlyProgression[lastIndex - 1] : null;
-  const currentScore =
-    currentMonthData != null
-      ? Number(currentMonthData.compositeScore || 0)
-      : Number(scores.compositeScore || 0);
-  const prevScore =
-    previousMonthData != null
-      ? Number(previousMonthData.compositeScore || 0)
-      : currentScore;
-  const scoreDelta = Math.round((currentScore - prevScore) * 10) / 10;
-  const isImproved = scoreDelta > 0;
-  const isDeclined = scoreDelta < 0;
+
+  const currVal =
+    chartActiveValues[lastIndex] ??
+    (isScoreMode ? Number(scores.compositeScore || 0) : Number(metrics.netSalesInr || 0));
+  const prevVal = chartActiveValues[lastIndex - 1] ?? currVal;
+  const valDelta = isScoreMode
+    ? Math.round((currVal - prevVal) * 10) / 10
+    : currVal - prevVal;
+  const isUp = valDelta > 0;
+  const isDown = valDelta < 0;
+
+  const chartThemeColor = isScoreMode ? '#7c3aed' : '#059669';
+
+  const lineChartData = {
+    labels: chartLabels.length > 0 ? chartLabels : ['Current'],
+    datasets: [
+      {
+        label: isScoreMode ? 'Composite Score (%)' : 'Net Sales (₹)',
+        data: chartActiveValues.length > 0 ? chartActiveValues : [currVal],
+        borderColor: chartThemeColor,
+        backgroundColor: (ctx) => {
+          const chart = ctx.chart;
+          const { ctx: c, chartArea } = chart;
+          if (!chartArea) {
+            return isScoreMode ? 'rgba(124, 58, 237, 0.12)' : 'rgba(5, 150, 105, 0.12)';
+          }
+          const grad = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          grad.addColorStop(0, isScoreMode ? 'rgba(124, 58, 237, 0.28)' : 'rgba(5, 150, 105, 0.28)');
+          grad.addColorStop(1, isScoreMode ? 'rgba(124, 58, 237, 0.01)' : 'rgba(5, 150, 105, 0.01)');
+          return grad;
+        },
+        fill: true,
+        tension: 0.36,
+        borderWidth: 2.5,
+        pointBackgroundColor: '#ffffff',
+        pointBorderColor: chartThemeColor,
+        pointBorderWidth: 2.5,
+        pointRadius: 4.5,
+        pointHoverRadius: 7,
+        pointHoverBackgroundColor: chartThemeColor,
+        pointHoverBorderColor: '#ffffff',
+        pointHoverBorderWidth: 2,
+      },
+    ],
+  };
+
+  const lineChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1e1b4b',
+        titleFont: { size: 11, weight: 'bold' },
+        bodyFont: { size: 11 },
+        padding: 8,
+        cornerRadius: 8,
+        callbacks: {
+          label: (item) => {
+            const rawScore = chartScoreValues[item.dataIndex] ?? 0;
+            const rawSales = chartSalesValues[item.dataIndex] ?? 0;
+            return isScoreMode
+              ? ` Score: ${rawScore}% (Sales: ${formatInr(rawSales)})`
+              : ` Sales: ${formatInr(rawSales)} (Score: ${rawScore}%)`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        border: { display: false },
+        ticks: {
+          font: { size: 10.5, weight: '600' },
+          color: '#64748b',
+        },
+      },
+      y: {
+        beginAtZero: !isScoreMode,
+        suggestedMin: isScoreMode
+          ? Math.max(0, Math.floor((Math.min(...(chartScoreValues.length ? chartScoreValues : [40])) - 6) / 5) * 5)
+          : 0,
+        suggestedMax: isScoreMode
+          ? Math.min(100, Math.ceil((Math.max(...(chartScoreValues.length ? chartScoreValues : [85])) + 6) / 5) * 5)
+          : undefined,
+        grid: { color: '#f1f5f9' },
+        border: { display: false },
+        ticks: {
+          font: { size: 9.5 },
+          color: '#94a3b8',
+          maxTicksLimit: 4,
+          callback: (val) =>
+            isScoreMode
+              ? `${val}%`
+              : val >= 100000
+                ? `₹${(val / 100000).toFixed(1)}L`
+                : val >= 1000
+                  ? `₹${Math.round(val / 1000)}k`
+                  : `₹${val}`,
+        },
+      },
+    },
+  };
 
   return (
     <div className="page-container" style={{ maxWidth: 1200, paddingBottom: 60 }}>
@@ -368,7 +473,7 @@ export default function EmployeePortalPage({
               </div>
             </div>
 
-            {/* Month-Wise Improvement Analytics (Spanning columns 2 & 3 per user request) */}
+            {/* Month-Wise Improvement Line Chart Card */}
             <div className="card emp-kpi-improvement-card">
               <div
                 style={{
@@ -377,7 +482,7 @@ export default function EmployeePortalPage({
                   alignItems: 'flex-start',
                   marginBottom: 6,
                   flexWrap: 'wrap',
-                  gap: 6,
+                  gap: 8,
                 }}
               >
                 <div>
@@ -391,28 +496,82 @@ export default function EmployeePortalPage({
                       gap: 6,
                     }}
                   >
-                    <TrendingUp size={14} color="#6d28d9" />
-                    Month-Wise Improvement Analytics
+                    <TrendingUp size={14} color={chartThemeColor} />
+                    Month-Wise Improvement Line Chart
                   </div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 3 }}>
                     <span
                       style={{
                         fontSize: 22,
                         fontWeight: 800,
-                        color: isImproved ? '#10b981' : isDeclined ? '#f59e0b' : '#6d28d9',
+                        color: isUp ? '#10b981' : isDown ? '#f59e0b' : chartThemeColor,
                       }}
                     >
-                      {isImproved ? `+${scoreDelta}%` : `${scoreDelta}%`}
+                      {isScoreMode
+                        ? isUp
+                          ? `+${valDelta}%`
+                          : `${valDelta}%`
+                        : isUp
+                          ? `+${formatInr(valDelta)}`
+                          : `${formatInr(valDelta)}`}
                     </span>
                     <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
                       {previousMonthData
-                        ? `MoM vs ${previousMonthData.label} (${prevScore}%)`
+                        ? `MoM vs ${previousMonthData.label} (${isScoreMode ? `${prevVal}%` : formatInr(prevVal)})`
                         : 'Tracking showroom trajectory'}
                     </span>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {/* Metric Switcher Pills */}
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      background: '#f1f5f9',
+                      padding: 2,
+                      borderRadius: 8,
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setTrendMetric('score')}
+                      style={{
+                        border: 'none',
+                        background: isScoreMode ? '#ffffff' : 'transparent',
+                        color: isScoreMode ? '#6d28d9' : 'var(--text-muted)',
+                        fontWeight: isScoreMode ? 700 : 500,
+                        padding: '3px 9px',
+                        borderRadius: 6,
+                        fontSize: 11,
+                        cursor: 'pointer',
+                        boxShadow: isScoreMode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      Score %
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTrendMetric('sales')}
+                      style={{
+                        border: 'none',
+                        background: !isScoreMode ? '#ffffff' : 'transparent',
+                        color: !isScoreMode ? '#059669' : 'var(--text-muted)',
+                        fontWeight: !isScoreMode ? 700 : 500,
+                        padding: '3px 9px',
+                        borderRadius: 6,
+                        fontSize: 11,
+                        cursor: 'pointer',
+                        boxShadow: !isScoreMode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      Sales ₹
+                    </button>
+                  </div>
+
                   <span
                     style={{
                       display: 'inline-flex',
@@ -422,115 +581,37 @@ export default function EmployeePortalPage({
                       borderRadius: 12,
                       fontSize: 11,
                       fontWeight: 700,
-                      background: isImproved ? '#ecfdf5' : isDeclined ? '#fffbeb' : '#f5f3ff',
-                      color: isImproved ? '#065f46' : isDeclined ? '#b45309' : '#6d28d9',
+                      background: isUp ? '#ecfdf5' : isDown ? '#fffbeb' : '#f5f3ff',
+                      color: isUp ? '#065f46' : isDown ? '#b45309' : '#6d28d9',
                     }}
                   >
-                    {isImproved ? (
+                    {isUp ? (
                       <>
-                        <TrendingUp size={12} /> Upward Trend
+                        <TrendingUp size={12} /> Improving
                       </>
-                    ) : isDeclined ? (
+                    ) : isDown ? (
                       <>
                         <TrendingDown size={12} /> Needs Focus
                       </>
                     ) : (
-                      '⚖️ Stable Pace'
+                      '⚖️ Stable'
                     )}
                   </span>
                 </div>
               </div>
 
-              {/* Monthly Progression Micro Bars */}
+              {/* Responsive Line Chart */}
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${Math.max(monthlyProgression.length, 1)}, 1fr)`,
-                  gap: 8,
-                  alignItems: 'end',
-                  paddingTop: 6,
+                  height: 105,
+                  width: '100%',
+                  position: 'relative',
+                  marginTop: 6,
+                  paddingTop: 4,
                   borderTop: '1px solid var(--border)',
-                  marginTop: 4,
                 }}
               >
-                {monthlyProgression.map((m, idx) => {
-                  const isCurrent = idx === monthlyProgression.length - 1;
-                  const score = Number(m.compositeScore || 0);
-                  const barHeight = Math.max(10, Math.round((score / 100) * 36));
-
-                  return (
-                    <div
-                      key={m.monthKey || idx}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: 3,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 10.5,
-                          fontWeight: isCurrent ? 800 : 600,
-                          color: isCurrent ? '#6d28d9' : 'var(--text-muted)',
-                        }}
-                      >
-                        {score > 0 ? `${Math.round(score)}%` : '—'}
-                      </span>
-
-                      {/* Bar Track & Fill */}
-                      <div
-                        style={{
-                          width: '100%',
-                          maxWidth: 32,
-                          height: 36,
-                          background: isCurrent ? '#ede9fe' : '#f1f5f9',
-                          borderRadius: 6,
-                          display: 'flex',
-                          alignItems: 'flex-end',
-                          overflow: 'hidden',
-                        }}
-                        title={`${m.label}: ${score}% composite score • ₹${(m.netSalesInr || 0).toLocaleString('en-IN')} net sales`}
-                      >
-                        <div
-                          style={{
-                            width: '100%',
-                            height: `${barHeight}px`,
-                            background: isCurrent
-                              ? 'linear-gradient(180deg, #7c3aed, #4c1d95)'
-                              : '#cbd5e1',
-                            borderRadius: 6,
-                            transition: 'height 0.4s ease',
-                          }}
-                        />
-                      </div>
-
-                      <div style={{ textAlign: 'center' }}>
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: isCurrent ? 700 : 500,
-                            color: isCurrent ? '#1e1b4b' : 'var(--text-muted)',
-                          }}
-                        >
-                          {m.label}
-                        </span>
-                        <div
-                          style={{
-                            fontSize: 9.5,
-                            color: isCurrent && m.netSalesInr > 0 ? '#059669' : 'var(--text-muted)',
-                            fontWeight: isCurrent && m.netSalesInr > 0 ? 700 : 400,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {m.netSalesInr > 0
-                            ? `₹${Math.round(m.netSalesInr / 1000)}k`
-                            : '₹0'}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                <Line data={lineChartData} options={lineChartOptions} />
               </div>
             </div>
           </div>
