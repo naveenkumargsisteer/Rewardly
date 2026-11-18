@@ -1073,7 +1073,17 @@ export default function EmployeePortalPage({
                         alignItems: 'center',
                       }}
                     >
-                      <strong style={{ fontSize: 13.5 }}>{fb.customer_name || 'Customer'}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <strong style={{ fontSize: 13.5 }}>{fb.customer_name || 'Customer'}</strong>
+                        {fb.sentiment && (
+                          <span
+                            className={`status-badge status-${fb.sentiment === 'Positive' ? 'Approved' : fb.sentiment === 'Neutral' ? 'Pending' : 'Rejected'}`}
+                            style={{ fontSize: 10.5, padding: '1px 8px' }}
+                          >
+                            {fb.sentiment}
+                          </span>
+                        )}
+                      </div>
                       <div
                         style={{
                           display: 'flex',
@@ -1088,13 +1098,39 @@ export default function EmployeePortalPage({
                         <span>{fb.rating} / 5</span>
                       </div>
                     </div>
-                    {fb.notes && (
-                      <p style={{ margin: '6px 0 0', fontSize: 13, color: '#334155' }}>
-                        "{fb.notes}"
-                      </p>
+
+                    {/* Customer Feedback Message / Comment */}
+                    {(fb.comment || fb.notes || fb.message) ? (
+                      <div
+                        style={{
+                          margin: '8px 0 4px',
+                          padding: '8px 12px',
+                          background: '#ffffff',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: 8,
+                          fontSize: 12.5,
+                          color: '#1e293b',
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        <span style={{ color: '#6d28d9', fontWeight: 700, marginRight: 6 }}>
+                          💬 Customer Message:
+                        </span>
+                        <span>&ldquo;{fb.comment || fb.notes || fb.message}&rdquo;</span>
+                      </div>
+                    ) : (
+                      <div style={{ margin: '4px 0', fontSize: 11.5, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        (Customer rated without written comments)
+                      </div>
                     )}
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                      {formatDate(fb.created_at || fb.date)}
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                      <span>{formatDate(fb.created_at || fb.feedback_date || fb.date)}</span>
+                      {fb.channel && fb.channel.includes('[bill:') && (
+                        <span style={{ color: '#6d28d9', fontWeight: 600 }}>
+                          {fb.channel.match(/\[bill:\s*([^\]]+)\]/)?.[1] ? `Bill #${fb.channel.match(/\[bill:\s*([^\]]+)\]/)[1]}` : ''}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}

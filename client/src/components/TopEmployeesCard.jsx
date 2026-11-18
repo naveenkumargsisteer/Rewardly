@@ -4,22 +4,22 @@ import { formatCompactInr } from '../api/client';
 import EmployeeAvatar from './EmployeeAvatar';
 
 export default function TopEmployeesCard({ employees, onViewAll, onSelectEmployee }) {
-  const topFive = (employees || []).slice(0, 5);
+  const topList = (employees || []).slice(0, 8);
 
   return (
     <div className="card">
       <div className="card-header">
         <div className="card-title-row">
           <Trophy size={17} color="#f59e0b" />
-          <span>Top Recognized Employees</span>
+          <span>Top Performing Showroom Staff</span>
         </div>
         <button type="button" className="link-btn" onClick={onViewAll}>
           View All ({employees?.length || 0}) <ArrowRight size={13} />
         </button>
       </div>
 
-      <div className="top-emp-list">
-        {topFive.map((emp) => (
+      <div className="top-emp-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 10 }}>
+        {topList.map((emp) => (
           <div
             key={emp.id}
             className="top-emp-row"
@@ -27,9 +27,10 @@ export default function TopEmployeesCard({ employees, onViewAll, onSelectEmploye
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter') onSelectEmployee(emp.id); }}
+            style={{ margin: 0 }}
           >
             <div className="top-emp-left">
-              <EmployeeAvatar employee={emp} size={32} />
+              <EmployeeAvatar employee={emp} size={34} />
               <div style={{ minWidth: 0 }}>
                 <div className="emp-name">
                   #{emp.rank} {emp.full_name}

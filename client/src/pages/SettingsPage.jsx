@@ -101,19 +101,31 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
   }
 
   const totalWeight =
-    Number(settings.sales_weight) +
-    Number(settings.attendance_weight) +
-    Number(settings.feedback_weight) +
-    Number(settings.recognition_weight);
+    Number(settings.attendance_weight || 0) +
+    Number(settings.feedback_weight || 0) +
+    Number(settings.sales_weight || 0);
 
   async function handleSaveSettings(e) {
     e?.preventDefault();
+    if (totalWeight !== 100) {
+      if (
+        !window.confirm(
+          `Total weights currently sum to ${totalWeight}%. The recommended total is 100% (e.g. 70% Attendance, 10% Feedback, 20% Sales). Do you want to save anyway?`
+        )
+      ) {
+        return;
+      }
+    }
     setSavingWeights(true);
     try {
-      const updated = await api.updateSettings({ settings });
+      const payload = {
+        ...settings,
+        recognition_weight: 0,
+      };
+      const updated = await api.updateSettings({ settings: payload });
       setSettings(updated.settings);
       onSettingsSaved();
-      showToast('Performance score weights saved!');
+      showToast('Performance score weights saved successfully!');
     } catch (err) {
       showToast(err.message);
     } finally {
@@ -191,32 +203,82 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
         </div>
 
         <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 0 }}>
-          Adjust how Rewardly computes each employee&apos;s composite score across Sales, Attendance, Customer Feedback, and Recognition.
+          Adjust how Rewardly computes each employee&apos;s composite score across Attendance, Customer Feedback, and Sales Target. Total weights should sum to 100%.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {[
-            { key: 'sales_weight', label: 'Showroom Net Sales Target Weight (%)' },
             { key: 'attendance_weight', label: 'Attendance & Punctuality Weight (%)' },
             { key: 'feedback_weight', label: 'Customer Feedback Rating Weight (%)' },
-            { key: 'recognition_weight', label: 'Peer & Manager Recognition Weight (%)' },
+            { key: 'sales_weight', label: 'Showroom Net Sales Target Weight (%)' },
           ].map((item) => (
             <div className="field" key={item.key}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ fontWeight: 600 }}>{item.label}</span>
-                <strong className="tabular-nums">{settings[item.key]}%</strong>
+                <strong className="tabular-nums">{settings[item.key] ?? 0}%</strong>
               </div>
               <div className="slider-row">
                 <input
                   type="range"
                   min={0}
-                  max={80}
-                  value={settings[item.key]}
+                  max={100}
+                  value={settings[item.key] ?? 0}
                   onChange={(e) => setSettings({ ...settings, [item.key]: Number(e.target.value) })}
                 />
               </div>
             </div>
           ))}
+
+          {/* Quick 100% Presets Bar */}
+          <div
+            style={{
+              padding: '10px 12px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>
+              Quick 100% Presets:
+            </span>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: 11, padding: '4px 8px' }}
+                onClick={() =>
+                  setSettings({
+                    ...settings,
+                    attendance_weight: 70,
+                    feedback_weight: 10,
+                    sales_weight: 20,
+                  })
+                }
+              >
+                70% Att / 10% FB / 20% Sales
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: 11, padding: '4px 8px' }}
+                onClick={() =>
+                  setSettings({
+                    ...settings,
+                    attendance_weight: 80,
+                    feedback_weight: 10,
+                    sales_weight: 10,
+                  })
+                }
+              >
+                80% Att / 10% FB / 10% Sales
+              </button>
+            </div>
+          </div>
 
           <div className="form-grid">
             <div className="field">

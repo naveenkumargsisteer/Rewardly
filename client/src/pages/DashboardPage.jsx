@@ -212,8 +212,7 @@ export default function DashboardPage({
                   <DeptBarChartCard departments={dashboard?.departmentBreakdown} />
                 </div>
 
-                <div className="charts-grid-2">
-                  <RecognitionDonutCard recognitionByType={dashboard?.recognitionByType} />
+                <div style={{ marginTop: 16 }}>
                   <TopEmployeesCard
                     employees={dashboard?.employeesRanked}
                     onViewAll={onViewAllEmployees}

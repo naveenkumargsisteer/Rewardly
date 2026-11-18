@@ -16,10 +16,10 @@ const {
 } = require('../utils/authUtils');
 
 const DEFAULT_SETTINGS = {
-  sales_weight: 40,
-  attendance_weight: 25,
-  feedback_weight: 20,
-  recognition_weight: 15,
+  sales_weight: 20,
+  attendance_weight: 70,
+  feedback_weight: 10,
+  recognition_weight: 0,
   gold_threshold: 85,
   silver_threshold: 72,
   public_export_token: 'rw_live_kaveri_2026',

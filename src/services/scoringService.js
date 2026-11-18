@@ -58,11 +58,10 @@ function scoreEmployees({
     (recByEmp[row.employee_id] ||= []).push(row);
   }
 
-  const wSales = Number(settings.sales_weight ?? 40);
-  const wAtt = Number(settings.attendance_weight ?? 25);
-  const wFb = Number(settings.feedback_weight ?? 20);
-  const wRec = Number(settings.recognition_weight ?? 15);
-  const totalW = Math.max(1, wSales + wAtt + wFb + wRec);
+  const wSales = Number(settings.sales_weight ?? 20);
+  const wAtt = Number(settings.attendance_weight ?? 70);
+  const wFb = Number(settings.feedback_weight ?? 10);
+  const totalW = Math.max(1, wSales + wAtt + wFb);
 
   const benchmarkRecPoints = Math.max(30, (daysInRange / 30) * 125);
 
@@ -133,9 +132,9 @@ function scoreEmployees({
     const recognitionPoints = empRec.reduce((acc, r) => acc + Number(r.points || 0), 0);
     const recognitionScore = round1(Math.min(100, (recognitionPoints / benchmarkRecPoints) * 100));
 
-    // 5. Weighted Composite Score
+    // 5. Weighted Composite Score (Excludes Recognition per showroom rules)
     const compositeScore = round1(
-      (salesScore * wSales + attendanceScore * wAtt + feedbackScore * wFb + recognitionScore * wRec) / totalW
+      (attendanceScore * wAtt + salesScore * wSales + feedbackScore * wFb) / totalW
     );
 
     const tier = compositeScore >= (settings.gold_threshold ?? 85)
@@ -144,7 +143,7 @@ function scoreEmployees({
         ? 'Silver'
         : 'Needs Coaching';
 
-    const formulaText = `(${salesScore} × ${wSales}% Sales) + (${attendanceScore} × ${wAtt}% Attendance) + (${feedbackScore} × ${wFb}% Feedback) + (${recognitionScore} × ${wRec}% Recognition) = ${compositeScore}%`;
+    const formulaText = `(${attendanceScore} × ${wAtt}% Attendance) + (${salesScore} × ${wSales}% Sales) + (${feedbackScore} × ${wFb}% Feedback) = ${compositeScore}%`;
 
     return {
       id: emp.id,

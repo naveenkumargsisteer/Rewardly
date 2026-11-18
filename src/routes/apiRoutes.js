@@ -343,14 +343,16 @@ router.put('/settings', async (req, res, next) => {
 
     if (settingsPatch) {
       const sum =
-        Number(settingsPatch.sales_weight ?? 40) +
-        Number(settingsPatch.attendance_weight ?? 25) +
-        Number(settingsPatch.feedback_weight ?? 20) +
-        Number(settingsPatch.recognition_weight ?? 15);
+        Number(settingsPatch.sales_weight ?? 20) +
+        Number(settingsPatch.attendance_weight ?? 70) +
+        Number(settingsPatch.feedback_weight ?? 10);
       if (sum <= 0) {
         return res.status(400).json({ error: 'Weight sum must be greater than 0.' });
       }
-      updatedSettings = await repo.updateSettings(settingsPatch);
+      updatedSettings = await repo.updateSettings({
+        ...settingsPatch,
+        recognition_weight: 0,
+      });
     } else {
       updatedSettings = await repo.getSettings();
     }
