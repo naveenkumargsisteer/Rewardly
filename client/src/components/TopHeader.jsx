@@ -300,7 +300,7 @@ export default function TopHeader({
                       <UserCheck size={16} />
                       <div>
                         <div className="profile-item-title">Staff Portal View</div>
-                        <div className="profile-item-sub">Preview Employee Score &amp; QR Standee</div>
+                        <div className="profile-item-sub">Preview Employee Score &amp; KPIs</div>
                       </div>
                     </button>
                   </>
@@ -327,7 +327,7 @@ export default function TopHeader({
                     <UserCheck size={16} />
                     <div>
                       <div className="profile-item-title">My Staff Portal</div>
-                      <div className="profile-item-sub">Performance, Reviews &amp; QR</div>
+                      <div className="profile-item-sub">Performance, Scores &amp; Reviews</div>
                     </div>
                   </button>
                 )}

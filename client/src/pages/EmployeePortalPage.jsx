@@ -5,20 +5,18 @@ import {
   Camera,
   CheckCircle2,
   Clock,
-  Download,
   KeyRound,
   Mail,
   Phone,
-  QrCode,
   RotateCcw,
   Sparkles,
   Star,
+  Target,
   Trash2,
   TrendingUp,
   User,
   Users,
 } from 'lucide-react';
-import QRCode from 'qrcode';
 import { api, compressImageToMinimalResolution, formatDate, formatInr } from '../api/client';
 import EmployeeAvatar from '../components/EmployeeAvatar';
 import RewardlyLoader from '../components/RewardlyLoader';
@@ -37,7 +35,6 @@ export default function EmployeePortalPage({
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadFeedback, setUploadFeedback] = useState('');
   const fileInputRef = useRef(null);
-  const qrCanvasRef = useRef(null);
 
   // Change password modal/inline state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -48,10 +45,6 @@ export default function EmployeePortalPage({
   const [savingPwd, setSavingPwd] = useState(false);
 
   const empCode = (employee?.emp_code || '').trim().toUpperCase();
-  const feedbackUrl =
-    empCode && typeof window !== 'undefined'
-      ? `${window.location.origin}/feedback/${encodeURIComponent(empCode)}`
-      : '';
 
   // Load employee analytics details
   useEffect(() => {
@@ -70,24 +63,6 @@ export default function EmployeePortalPage({
       })
       .finally(() => setLoadingDetail(false));
   }, [employee?.id, showToast]);
-
-  // Render QR Code to canvas
-  useEffect(() => {
-    if (!feedbackUrl || !qrCanvasRef.current) return;
-    QRCode.toCanvas(
-      qrCanvasRef.current,
-      feedbackUrl,
-      {
-        width: 160,
-        margin: 1,
-        errorCorrectionLevel: 'M',
-        color: { dark: '#1e1b4b', light: '#ffffff' },
-      },
-      (err) => {
-        if (err) console.error('Failed to generate QR code', err);
-      }
-    );
-  }, [feedbackUrl]);
 
   // Handle Minimal-Resolution Profile Picture Upload
   async function handleFileSelected(e) {
@@ -135,108 +110,6 @@ export default function EmployeePortalPage({
     } finally {
       setUploadingAvatar(false);
     }
-  }
-
-  // Download High-Resolution Printable Standee QR Poster
-  function downloadQrPoster() {
-    if (!empCode) return;
-    const offscreen = document.createElement('canvas');
-    const width = 800;
-    const height = 1000;
-    offscreen.width = width;
-    offscreen.height = height;
-    const ctx = offscreen.getContext('2d');
-
-    // Background gradient
-    const grad = ctx.createLinearGradient(0, 0, 0, height);
-    grad.addColorStop(0, '#f5f3ff');
-    grad.addColorStop(1, '#ffffff');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, width, height);
-
-    // Header banner
-    ctx.fillStyle = '#6d28d9';
-    ctx.fillRect(0, 0, width, 140);
-
-    // Title
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 36px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Rate My Service Today', width / 2, 70);
-
-    ctx.font = '500 20px Inter, sans-serif';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.fillText('Kaveri Silks & Textiles • Staff Feedback', width / 2, 108);
-
-    // Employee Name & Code
-    ctx.fillStyle = '#1e1b4b';
-    ctx.font = 'bold 34px Inter, sans-serif';
-    ctx.fillText(employee?.full_name || 'Staff Member', width / 2, 215);
-
-    ctx.fillStyle = '#6d28d9';
-    ctx.font = '600 22px Inter, sans-serif';
-    ctx.fillText(
-      `${employee?.role || 'Textile Consultant'} • ID: ${empCode}`,
-      width / 2,
-      252
-    );
-
-    // Generate high-res QR code
-    QRCode.toCanvas(
-      offscreen,
-      feedbackUrl,
-      {
-        width: 380,
-        margin: 2,
-        errorCorrectionLevel: 'H',
-        color: { dark: '#1e1b4b', light: '#ffffff' },
-      },
-      (err) => {
-        if (err) return console.error(err);
-
-        // Frame card behind QR
-        const qrCanvas = document.createElement('canvas');
-        QRCode.toCanvas(
-          qrCanvas,
-          feedbackUrl,
-          { width: 380, margin: 1, color: { dark: '#1e1b4b', light: '#ffffff' } },
-          (err2) => {
-            if (!err2) {
-              ctx.fillStyle = '#ffffff';
-              ctx.shadowColor = 'rgba(0, 0, 0, 0.12)';
-              ctx.shadowBlur = 24;
-              ctx.shadowOffsetY = 8;
-              ctx.beginPath();
-              ctx.roundRect((width - 420) / 2, 290, 420, 420, 24);
-              ctx.fill();
-              ctx.shadowColor = 'transparent';
-
-              ctx.drawImage(qrCanvas, (width - 380) / 2, 310);
-
-              // Instructions
-              ctx.fillStyle = '#141829';
-              ctx.font = 'bold 24px Inter, sans-serif';
-              ctx.fillText('Scan with Any Phone Camera', width / 2, 770);
-
-              ctx.font = '500 18px Inter, sans-serif';
-              ctx.fillStyle = '#646b82';
-              ctx.fillText('No app install required • Takes 10 seconds', width / 2, 805);
-
-              // Footer branding
-              ctx.font = 'bold 20px Inter, sans-serif';
-              ctx.fillStyle = '#6d28d9';
-              ctx.fillText('Powered by Rewardly AI', width / 2, 930);
-
-              const link = document.createElement('a');
-              link.download = `Rewardly-Feedback-QR-${empCode}.png`;
-              link.href = offscreen.toDataURL('image/png');
-              link.click();
-              showToast?.(`Downloaded QR Standee for ${empCode}`);
-            }
-          }
-        );
-      }
-    );
   }
 
   // Handle Password Change
@@ -499,9 +372,9 @@ export default function EmployeePortalPage({
                   fontSize: 13,
                 }}
               >
-                No customer ratings submitted yet for your QR code.
+                No customer ratings submitted yet for your assistance.
                 <br />
-                Display your counter standee QR code to start receiving direct feedback!
+                Direct ratings will appear here as customers scan the QR code on their billing receipt.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -599,56 +472,57 @@ export default function EmployeePortalPage({
           </div>
         </div>
 
-        {/* Right Column: Customer Feedback QR Code Standee */}
+        {/* Right Column: Profile Overview & Performance Breakdown */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div className="card emp-qr-card">
+          {/* Profile Details Card */}
+          <div className="card" style={{ padding: 22 }}>
             <div
               style={{
-                display: 'inline-flex',
+                display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                width: 44,
-                height: 44,
-                borderRadius: '50%',
-                background: '#ede9fe',
-                color: '#6d28d9',
-                margin: '0 auto 8px',
+                justifyContent: 'space-between',
+                marginBottom: 16,
               }}
             >
-              <QrCode size={22} />
-            </div>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>My Counter Feedback QR</h3>
-            <p style={{ margin: '4px 0 12px', fontSize: 12.5, color: 'var(--text-muted)' }}>
-              Customers can scan this code to rate your service directly on their smartphones.
-            </p>
-
-            <div className="emp-qr-box">
-              <canvas ref={qrCanvasRef} style={{ display: 'block', borderRadius: 8 }} />
-            </div>
-
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#6d28d9' }}>
-              Employee ID: {empCode}
-            </div>
-            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 16 }}>
-              No app required • Instant anonymous mobile form
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={downloadQrPoster}
-                style={{ width: '100%', justifyContent: 'center' }}
+              <h4
+                style={{
+                  margin: 0,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
               >
-                <Download size={15} /> Download Printable QR Standee (PNG)
-              </button>
+                <User size={16} color="#6d28d9" /> Profile Details
+              </h4>
+              <span
+                style={{
+                  fontSize: 11.5,
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  background: '#ede9fe',
+                  color: '#6d28d9',
+                  fontWeight: 700,
+                }}
+              >
+                {empCode}
+              </span>
             </div>
-          </div>
 
-          {/* Profile & Shift Overview Card */}
-          <div className="card" style={{ padding: 22 }}>
-            <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700 }}>Profile Details</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 11, fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Role</span>
+                <strong>{employee?.role || 'Staff Consultant'}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Department</span>
+                <strong>{employee?.department_name || 'Silk & Sarees'}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Shift Timings</span>
+                <strong>{employee?.shift || 'Morning (10:00 - 19:30)'}</strong>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Email</span>
                 <strong>{employee?.email || '—'}</strong>
@@ -656,10 +530,6 @@ export default function EmployeePortalPage({
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Phone</span>
                 <strong>{employee?.phone || '—'}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Department</span>
-                <strong>{employee?.department_name || 'Silk & Sarees'}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Joined Date</span>
@@ -674,7 +544,7 @@ export default function EmployeePortalPage({
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  paddingTop: 8,
+                  paddingTop: 10,
                   marginTop: 2,
                   borderTop: '1px solid var(--border)',
                 }}
@@ -688,6 +558,89 @@ export default function EmployeePortalPage({
                 >
                   Change Password
                 </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Performance Targets & Weightage */}
+          <div className="card" style={{ padding: 22 }}>
+            <h4
+              style={{
+                margin: '0 0 14px',
+                fontSize: 15,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <Target size={16} color="#059669" /> Score Weightage &amp; Goals
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 12.5 }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Sales Target (40%)</span>
+                  <strong>{scores.salesScore != null ? `${scores.salesScore}%` : '96%'}</strong>
+                </div>
+                <div style={{ height: 6, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${Math.min(scores.salesScore || 96, 100)}%`,
+                      background: '#6d28d9',
+                      borderRadius: 99,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Customer Feedback (40%)</span>
+                  <strong>{scores.feedbackScore != null ? `${scores.feedbackScore}%` : '95%'}</strong>
+                </div>
+                <div style={{ height: 6, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${Math.min(scores.feedbackScore || 95, 100)}%`,
+                      background: '#f59e0b',
+                      borderRadius: 99,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Attendance &amp; Punctuality (20%)</span>
+                  <strong>{scores.attendanceScore != null ? `${scores.attendanceScore}%` : '98%'}</strong>
+                </div>
+                <div style={{ height: 6, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${Math.min(scores.attendanceScore || 98, 100)}%`,
+                      background: '#10b981',
+                      borderRadius: 99,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 6,
+                  padding: '10px 12px',
+                  background: '#f8fafc',
+                  borderRadius: 10,
+                  fontSize: 12,
+                  color: 'var(--text-muted)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                Customer feedback is collected via QR code on printed sales receipts. High ratings
+                directly boost your composite score and monthly incentive tier!
               </div>
             </div>
           </div>
