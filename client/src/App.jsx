@@ -1,3 +1,4 @@
+// Rewardly App - Showroom Performance & Feedback Portal v1.0.1
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { api, getRoleCategory } from './api/client';
