@@ -114,6 +114,32 @@ export default function App() {
       .finally(() => setLoadingDash(false));
   }, [currentUser, showToast]);
 
+  // Real-time live synchronization for sales and customer feedback across dashboard
+  useEffect(() => {
+    function handleLiveUpdate() {
+      if (currentUser && (activePage === 'dashboard' || activePage === 'employees')) {
+        loadMetaAndDash(startDate, endDate, department);
+      }
+    }
+    function handleStorage(e) {
+      if (
+        (e.key === 'rewardly:last_sale_timestamp' || e.key === 'rewardly:last_feedback_timestamp') &&
+        currentUser &&
+        (activePage === 'dashboard' || activePage === 'employees')
+      ) {
+        loadMetaAndDash(startDate, endDate, department);
+      }
+    }
+    window.addEventListener('rewardly:sale_created', handleLiveUpdate);
+    window.addEventListener('rewardly:feedback_created', handleLiveUpdate);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('rewardly:sale_created', handleLiveUpdate);
+      window.removeEventListener('rewardly:feedback_created', handleLiveUpdate);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [currentUser, activePage, startDate, endDate, department, loadMetaAndDash]);
+
   function handleNavigate(page) {
     setActivePage(page);
     const nextUrl =

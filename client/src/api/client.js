@@ -72,8 +72,10 @@ export const api = {
     if (!res.ok) throw new Error('Could not load schema');
     return res.text();
   },
-  getPublicFeedbackTarget: (empRef) =>
-    request(`/api/public/feedback-target/${encodeURIComponent(empRef)}`),
+  getPublicFeedbackTarget: (empRef, { bill } = {}) => {
+    const q = bill ? `?bill=${encodeURIComponent(bill)}` : '';
+    return request(`/api/public/feedback-target/${encodeURIComponent(empRef)}${q}`);
+  },
   submitPublicFeedback: (payload) =>
     request('/api/public/feedback', { method: 'POST', body: JSON.stringify(payload) }),
   employeeLogin: ({ emp_code, password }) =>

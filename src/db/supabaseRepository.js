@@ -563,37 +563,35 @@ class SupabaseRepository {
     };
   }
 
-  async hasIpSubmittedFeedback(clientIp) {
-    if (!clientIp) return false;
-    const cleanIp = String(clientIp).trim();
-    if (!cleanIp || cleanIp === '127.0.0.1' || cleanIp === '::1') {
-      return false;
-    }
+  async hasBillSubmittedFeedback(billRef) {
+    if (!billRef) return false;
+    const cleanBill = String(billRef).trim();
+    if (!cleanBill) return false;
     const { count, error } = await this.supabase
       .from('customer_feedback')
       .select('id', { count: 'exact', head: true })
-      .ilike('channel', `%[ip: ${cleanIp}]%`);
+      .ilike('channel', `%[bill: ${cleanBill}]%`);
 
     if (error) {
-      console.warn('[Supabase hasIpSubmittedFeedback warning]', error.message);
+      console.warn('[Supabase hasBillSubmittedFeedback warning]', error.message);
       return false;
     }
     return (count || 0) > 0;
   }
 
-  async createPublicFeedback(payload, clientIp = null) {
+  async createPublicFeedback(payload) {
     const clean = sanitizePublicFeedbackPayload(payload);
-    const cleanIp = clientIp ? String(clientIp).trim() : null;
+    const billRef = (payload.bill || payload.invoice_no || '').trim();
 
-    if (cleanIp && cleanIp !== '127.0.0.1' && cleanIp !== '::1') {
-      const alreadySubmitted = await this.hasIpSubmittedFeedback(cleanIp);
+    if (billRef) {
+      const alreadySubmitted = await this.hasBillSubmittedFeedback(billRef);
       if (alreadySubmitted) {
-        throw httpError(429, `A customer review has already been submitted from this IP address (${cleanIp}). Only one review is allowed per customer.`);
+        throw httpError(409, `Feedback for Bill/Invoice #${billRef} has already been submitted.`);
       }
     }
 
     const target = await this.getEmployeePublicTarget(clean.empRef);
-    const channelWithIp = cleanIp ? `In-Store QR [ip: ${cleanIp}]` : clean.channel;
+    const channel = billRef ? `Bill Receipt QR [bill: ${billRef}]` : clean.channel || 'Customer QR Feedback';
 
     const row = {
       id: crypto.randomUUID(),
@@ -604,7 +602,7 @@ class SupabaseRepository {
       sentiment: clean.sentiment,
       customer_name: clean.customer_name,
       comment: clean.comment,
-      channel: channelWithIp,
+      channel,
     };
 
     const { error } = await this.supabase.from('customer_feedback').insert(row);

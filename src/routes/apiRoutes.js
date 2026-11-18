@@ -411,12 +411,12 @@ router.get('/public/feedback-target/:empRef', async (req, res, next) => {
   try {
     const repo = getRepository();
     const target = await repo.getEmployeePublicTarget(req.params.empRef);
-    const clientIp = getClientIp(req);
-    const alreadySubmitted = await repo.hasIpSubmittedFeedback(clientIp);
+    const billRef = (req.query.bill || req.query.invoice || '').trim();
+    const alreadySubmitted = billRef ? await repo.hasBillSubmittedFeedback(billRef) : false;
     res.json({
       ...target,
+      bill: billRef || null,
       alreadySubmitted: Boolean(alreadySubmitted),
-      clientIp,
     });
   } catch (err) {
     next(err);
@@ -426,8 +426,7 @@ router.get('/public/feedback-target/:empRef', async (req, res, next) => {
 router.post('/public/feedback', async (req, res, next) => {
   try {
     const repo = getRepository();
-    const clientIp = getClientIp(req);
-    const created = await repo.createPublicFeedback(req.body || {}, clientIp);
+    const created = await repo.createPublicFeedback(req.body || {});
     res.status(201).json(created);
   } catch (err) {
     next(err);

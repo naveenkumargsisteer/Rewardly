@@ -151,7 +151,7 @@ export default function LoginPage({ onLoginSuccess }) {
           <form className="login-gateway-form" onSubmit={handleLogin} style={{ padding: '24px 28px 32px' }}>
             <div className="form-group" style={{ marginBottom: 18 }}>
               <label className="field-label" htmlFor="gateway-emp-id">
-                Employee ID (Username)
+                Employee ID
               </label>
               <div style={{ position: 'relative' }}>
                 <input
@@ -176,9 +176,7 @@ export default function LoginPage({ onLoginSuccess }) {
                   style={{ position: 'absolute', left: 12, top: 12, pointerEvents: 'none' }}
                 />
               </div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
-                Enter your Employee ID to access your showroom workspace.
-              </div>
+
             </div>
 
             <div className="form-group" style={{ marginBottom: 24 }}>

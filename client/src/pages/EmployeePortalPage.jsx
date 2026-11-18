@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import '../components/chartSetup';
 import {
@@ -22,6 +22,7 @@ import {
   TrendingUp,
   User,
   Users,
+  Zap,
 } from 'lucide-react';
 import { api, compressImageToMinimalResolution, formatDate, formatInr } from '../api/client';
 import EmployeeAvatar from '../components/EmployeeAvatar';
@@ -85,6 +86,10 @@ export default function EmployeePortalPage({
     const minD = dateBounds.minDate || '2026-07-12';
     const maxD = dateBounds.maxDate || '2026-11-18';
 
+    if (mode === 'today') {
+      const todayStr = maxD || new Date().toISOString().slice(0, 10);
+      return { startDate: todayStr, endDate: todayStr };
+    }
     if (mode === 'full') {
       return { startDate: minD, endDate: maxD };
     }
@@ -171,10 +176,10 @@ export default function EmployeePortalPage({
     }));
   }
 
-  // Load employee analytics details (re-fetches when employee ID or date range changes)
-  useEffect(() => {
+  // Load employee analytics details (with optional silent background refresh for live sync)
+  const fetchMetrics = useCallback((silent = false) => {
     if (!employee?.id) return;
-    setLoadingDetail(true);
+    if (!silent) setLoadingDetail(true);
     api
       .getEmployeeDetail(employee.id, {
         startDate: dateRange.startDate || undefined,
@@ -187,10 +192,59 @@ export default function EmployeePortalPage({
         }
       })
       .catch((err) => {
-        showToast?.(err.message || 'Failed to load performance metrics.');
+        if (!silent) showToast?.(err.message || 'Failed to load performance metrics.');
       })
-      .finally(() => setLoadingDetail(false));
+      .finally(() => {
+        if (!silent) setLoadingDetail(false);
+      });
   }, [employee?.id, dateRange.startDate, dateRange.endDate, showToast]);
+
+  useEffect(() => {
+    fetchMetrics(false);
+  }, [fetchMetrics]);
+
+  // Real-time live synchronization for sales, counter billing, and customer feedback
+  useEffect(() => {
+    function handleSaleCreated() {
+      fetchMetrics(true);
+    }
+    function handleFeedbackCreated() {
+      fetchMetrics(true);
+    }
+    function handleStorage(e) {
+      if (
+        e.key === 'rewardly:last_sale_timestamp' ||
+        e.key === 'rewardly:last_feedback_timestamp'
+      ) {
+        fetchMetrics(true);
+      }
+    }
+    function handleVisibility() {
+      if (document.visibilityState === 'visible') {
+        fetchMetrics(true);
+      }
+    }
+
+    // Fast 5-second polling when tab is active to capture cross-device/network cashier sales live
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchMetrics(true);
+      }
+    }, 5000);
+
+    window.addEventListener('rewardly:sale_created', handleSaleCreated);
+    window.addEventListener('rewardly:feedback_created', handleFeedbackCreated);
+    window.addEventListener('storage', handleStorage);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('rewardly:sale_created', handleSaleCreated);
+      window.removeEventListener('rewardly:feedback_created', handleFeedbackCreated);
+      window.removeEventListener('storage', handleStorage);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [fetchMetrics]);
 
   // Handle Minimal-Resolution Profile Picture Upload
   async function handleFileSelected(e) {
@@ -508,10 +562,10 @@ export default function EmployeePortalPage({
           <div className="emp-filter-modes">
             <button
               type="button"
-              className={`emp-filter-mode-btn ${filterMode === 'full' ? 'active' : ''}`}
-              onClick={() => handleModeSelect('full')}
+              className={`emp-filter-mode-btn ${filterMode === 'today' ? 'active' : ''}`}
+              onClick={() => handleModeSelect('today')}
             >
-              <Globe size={13} /> Full Time
+              <Zap size={13} /> Today
             </button>
 
             <button
@@ -540,6 +594,14 @@ export default function EmployeePortalPage({
 
             <button
               type="button"
+              className={`emp-filter-mode-btn ${filterMode === 'full' ? 'active' : ''}`}
+              onClick={() => handleModeSelect('full')}
+            >
+              <Globe size={13} /> Full Time
+            </button>
+
+            <button
+              type="button"
               className={`emp-filter-mode-btn ${filterMode === 'custom' ? 'active' : ''}`}
               onClick={() => handleModeSelect('custom')}
             >
@@ -551,6 +613,27 @@ export default function EmployeePortalPage({
         {/* Dynamic Sub-Row with Period Selectors & Date Range */}
         <div className="emp-filter-subrow">
           <div className="emp-filter-controls-group">
+            {filterMode === 'today' && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: '#0284c7',
+                    background: '#e0f2fe',
+                    padding: '4px 10px',
+                    borderRadius: 8,
+                  }}
+                >
+                  <Zap size={12} color="#0284c7" />
+                  Today&apos;s Live Sales & Shift ({formatDate(dateRange.startDate || dateBounds.maxDate)})
+                </span>
+              </div>
+            )}
+
             {filterMode === 'month' && (
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
@@ -669,8 +752,25 @@ export default function EmployeePortalPage({
           {/* Key Metric Tiles & Month-Wise Improvement Analytics */}
           <div className="emp-kpi-grid">
             <div className="card" style={{ padding: 18 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-                Composite Score
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Composite Score</span>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: '#7c3aed',
+                    background: 'rgba(124, 58, 237, 0.1)',
+                    padding: '2px 7px',
+                    borderRadius: 12,
+                  }}
+                  title="Auto-updates live when new bills or customer ratings are submitted"
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed', display: 'inline-block', boxShadow: '0 0 6px #7c3aed' }}></span>
+                  Real-Time
+                </span>
               </div>
               <div
                 style={{
@@ -688,8 +788,25 @@ export default function EmployeePortalPage({
             </div>
 
             <div className="card" style={{ padding: 18 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-                Net Sales Achieved
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Net Sales Achieved</span>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: '#059669',
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    padding: '2px 7px',
+                    borderRadius: 12,
+                  }}
+                  title="Auto-updates live as bills are generated at cashier counter"
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 6px #10b981' }}></span>
+                  Real-Time
+                </span>
               </div>
               <div
                 style={{
@@ -699,10 +816,10 @@ export default function EmployeePortalPage({
                   margin: '6px 0 2px',
                 }}
               >
-                {metrics.netSalesInr != null ? formatInr(metrics.netSalesInr) : '₹12,40,000'}
+                {metrics.netSalesInr != null ? formatInr(metrics.netSalesInr) : '₹0'}
               </div>
               <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                Target Completion: {scores.salesScore != null ? `${scores.salesScore}%` : '96%'}
+                Target Completion: {scores.salesScore != null ? `${scores.salesScore}%` : '0%'}
               </div>
             </div>
 

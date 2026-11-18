@@ -28,12 +28,19 @@ export default function MobileFeedbackPage({ empRef }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  const billId =
+    typeof window !== 'undefined'
+      ? (
+          new URLSearchParams(window.location.search).get('bill') ||
+          new URLSearchParams(window.location.search).get('invoice') ||
+          ''
+        ).trim()
+      : '';
+
   const [alreadySubmitted, setAlreadySubmitted] = useState(() => {
+    if (!billId) return false;
     try {
-      return (
-        localStorage.getItem('rewardly_feedback_submitted') === 'true' ||
-        (empRef && localStorage.getItem(`rewardly_fb_${empRef}`) === 'true')
-      );
+      return localStorage.getItem(`rewardly_fb_bill_${billId}`) === 'true';
     } catch {
       return false;
     }
@@ -52,7 +59,8 @@ export default function MobileFeedbackPage({ empRef }) {
     let active = true;
     setLoading(true);
     setLoadError('');
-    api.getPublicFeedbackTarget(empRef)
+    api
+      .getPublicFeedbackTarget(empRef, { bill: billId })
       .then((res) => {
         if (active) {
           setTarget(res);
@@ -70,7 +78,7 @@ export default function MobileFeedbackPage({ empRef }) {
     return () => {
       active = false;
     };
-  }, [empRef]);
+  }, [empRef, billId]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -84,14 +92,18 @@ export default function MobileFeedbackPage({ empRef }) {
         anonymous,
         rating,
         comment,
+        bill: billId,
       });
       setSubmittedRecord(created);
       setAlreadySubmitted(true);
+      if (billId) {
+        try {
+          localStorage.setItem(`rewardly_fb_bill_${billId}`, 'true');
+        } catch {}
+      }
       try {
-        localStorage.setItem('rewardly_feedback_submitted', 'true');
-        if (target.employee?.emp_code) {
-          localStorage.setItem(`rewardly_fb_${target.employee.emp_code}`, 'true');
-        }
+        window.dispatchEvent(new CustomEvent('rewardly:feedback_created', { detail: created }));
+        localStorage.setItem('rewardly:last_feedback_timestamp', Date.now().toString());
       } catch {}
     } catch (err) {
       setSubmitError(err.message || 'Could not submit feedback. Please try again.');
@@ -166,10 +178,19 @@ export default function MobileFeedbackPage({ empRef }) {
                   Your <strong>{Number(submittedRecord.rating).toFixed(1)}★</strong> review for{' '}
                   <strong>{target.employee.full_name}</strong> ({target.employee.emp_code}) was
                   recorded {submittedRecord.customer_name === 'Anonymous Customer' ? 'anonymously' : `as ${submittedRecord.customer_name}`}.
+                  {billId && (
+                    <div style={{ marginTop: 6, fontSize: 13, fontWeight: 700, color: '#059669' }}>
+                      Invoice #{billId} Verified
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
-                  Your customer review for <strong>{target.employee.full_name}</strong> ({target.employee.emp_code}) has already been recorded from this device / network.
+                  Customer feedback for <strong>{target.employee.full_name}</strong> ({target.employee.emp_code})
+                  {billId ? ` on Invoice #${billId}` : ''} has already been recorded.
+                  <div style={{ marginTop: 6, fontSize: 13, color: 'var(--text-muted)' }}>
+                    Each printed showroom receipt accepts 1 customer review. Thank you!
+                  </div>
                 </>
               )}
             </p>
@@ -186,13 +207,32 @@ export default function MobileFeedbackPage({ empRef }) {
                 fontWeight: 600,
               }}
             >
-              <ShieldCheck size={14} color="#059669" /> One Review Per Customer Enforced
+              <ShieldCheck size={14} color="#059669" /> Unique Bill Receipt Review Verified
             </div>
           </div>
         )}
 
         {!loading && !loadError && target && !submittedRecord && !alreadySubmitted && (
           <form onSubmit={handleSubmit}>
+            {billId && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '4px 12px',
+                  borderRadius: 8,
+                  background: '#f5f3ff',
+                  border: '1px solid #ddd6fe',
+                  color: '#6d28d9',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  marginBottom: 12,
+                }}
+              >
+                🧾 Verified Tax Invoice: {billId}
+              </div>
+            )}
             <div className="mobile-feedback-emp">
               <div
                 className="avatar-badge lg"

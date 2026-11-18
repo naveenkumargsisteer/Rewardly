@@ -275,6 +275,13 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
       const res = await api.createBillingInvoice(payload);
       if (res.success && res.invoice) {
         showToast?.(res.message);
+
+        // Real-time sync: notify all open dashboard & staff portal tabs immediately
+        try {
+          window.dispatchEvent(new CustomEvent('rewardly:sale_created', { detail: res.invoice }));
+          localStorage.setItem('rewardly:last_sale_timestamp', Date.now().toString());
+        } catch {}
+
         setRecentInvoices((prev) => [res.invoice, ...prev]);
         setActiveReceipt({
           ...res.invoice,
@@ -303,7 +310,8 @@ export default function BillingPage({ user, onLogout, onSwitchToManager, showToa
   useEffect(() => {
     if (activeReceipt && receiptQrRef.current) {
       const staffRef = activeReceipt.staffCode || activeReceipt.sales_emp_code || 'RW002';
-      const feedbackUrl = `${window.location.origin}/feedback/${encodeURIComponent(staffRef)}`;
+      const billNo = activeReceipt.invoice_no || activeReceipt.id;
+      const feedbackUrl = `${window.location.origin}/feedback/${encodeURIComponent(staffRef)}?bill=${encodeURIComponent(billNo)}`;
       QRCode.toCanvas(
         receiptQrRef.current,
         feedbackUrl,

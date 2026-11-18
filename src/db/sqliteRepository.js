@@ -463,31 +463,29 @@ class SqliteRepository {
     };
   }
 
-  async hasIpSubmittedFeedback(clientIp) {
-    if (!clientIp) return false;
-    const cleanIp = String(clientIp).trim();
-    if (!cleanIp || cleanIp === '127.0.0.1' || cleanIp === '::1') {
-      return false;
-    }
+  async hasBillSubmittedFeedback(billRef) {
+    if (!billRef) return false;
+    const cleanBill = String(billRef).trim();
+    if (!cleanBill) return false;
     const row = this.db
       .prepare('SELECT id FROM customer_feedback WHERE channel LIKE ? LIMIT 1')
-      .get(`%[ip: ${cleanIp}]%`);
+      .get(`%[bill: ${cleanBill}]%`);
     return Boolean(row);
   }
 
-  async createPublicFeedback(payload, clientIp = null) {
+  async createPublicFeedback(payload) {
     const clean = sanitizePublicFeedbackPayload(payload);
-    const cleanIp = clientIp ? String(clientIp).trim() : null;
+    const billRef = (payload.bill || payload.invoice_no || '').trim();
 
-    if (cleanIp && cleanIp !== '127.0.0.1' && cleanIp !== '::1') {
-      const alreadySubmitted = await this.hasIpSubmittedFeedback(cleanIp);
+    if (billRef) {
+      const alreadySubmitted = await this.hasBillSubmittedFeedback(billRef);
       if (alreadySubmitted) {
-        throw httpError(429, `A customer review has already been submitted from this IP address (${cleanIp}). Only one review is allowed per customer.`);
+        throw httpError(409, `Feedback for Bill/Invoice #${billRef} has already been submitted.`);
       }
     }
 
     const target = await this.getEmployeePublicTarget(clean.empRef);
-    const channelWithIp = cleanIp ? `In-Store QR [ip: ${cleanIp}]` : clean.channel;
+    const channel = billRef ? `Bill Receipt QR [bill: ${billRef}]` : clean.channel || 'Customer QR Feedback';
 
     const row = {
       id: crypto.randomUUID(),
@@ -498,7 +496,7 @@ class SqliteRepository {
       sentiment: clean.sentiment,
       customer_name: clean.customer_name,
       comment: clean.comment,
-      channel: channelWithIp,
+      channel,
     };
 
     this.db.prepare(`
