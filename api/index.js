@@ -1,3 +1,4 @@
+// Rewardly API Serverless Entry v1.0.1
 const app = require('../src/app');
 
 module.exports = (req, res) => {
