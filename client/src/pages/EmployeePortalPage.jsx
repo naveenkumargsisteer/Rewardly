@@ -7,7 +7,10 @@ import {
   Camera,
   CheckCircle2,
   Clock,
+  Filter,
+  Globe,
   KeyRound,
+  Layers,
   Mail,
   Phone,
   RotateCcw,
@@ -49,12 +52,134 @@ export default function EmployeePortalPage({
 
   const empCode = (employee?.emp_code || '').trim().toUpperCase();
 
-  // Load employee analytics details
+  // Dashboard Period Filter States
+  const [dateBounds, setDateBounds] = useState({
+    minDate: '2026-07-12',
+    maxDate: '2026-11-18',
+  });
+  const [filterMode, setFilterMode] = useState('full'); // 'full' | 'month' | 'quarter' | 'year' | 'custom'
+  const [selectedMonth, setSelectedMonth] = useState('2026-11');
+  const [selectedQuarter, setSelectedQuarter] = useState('2026-Q4');
+  const [selectedYear, setSelectedYear] = useState('2026');
+  const [dateRange, setDateRange] = useState({
+    startDate: '',
+    endDate: '',
+  });
+
+  // Fetch shop meta for active date bounds
+  useEffect(() => {
+    api.getMeta?.()
+      .then((meta) => {
+        if (meta?.dateBounds) {
+          setDateBounds(meta.dateBounds);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Compute preset dates for each filter category
+  function getPresetDates(
+    mode,
+    { month = selectedMonth, quarter = selectedQuarter, year = selectedYear } = {}
+  ) {
+    const minD = dateBounds.minDate || '2026-07-12';
+    const maxD = dateBounds.maxDate || '2026-11-18';
+
+    if (mode === 'full') {
+      return { startDate: minD, endDate: maxD };
+    }
+    if (mode === 'month') {
+      const [y, m] = month.split('-').map(Number);
+      const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const s = `${month}-01`;
+      const e = `${month}-${String(lastDay).padStart(2, '0')}`;
+      return {
+        startDate: s < minD ? minD : s,
+        endDate: e > maxD ? maxD : e,
+      };
+    }
+    if (mode === 'quarter') {
+      const [yStr, qStr] = quarter.split('-');
+      const y = parseInt(yStr, 10);
+      const quarterMap = {
+        Q1: { s: `${y}-01-01`, e: `${y}-03-31` },
+        Q2: { s: `${y}-04-01`, e: `${y}-06-30` },
+        Q3: { s: `${y}-07-01`, e: `${y}-09-30` },
+        Q4: { s: `${y}-10-01`, e: `${y}-12-31` },
+      };
+      const bounds = quarterMap[qStr] || quarterMap.Q4;
+      return {
+        startDate: bounds.s < minD ? minD : bounds.s,
+        endDate: bounds.e > maxD ? maxD : bounds.e,
+      };
+    }
+    if (mode === 'year') {
+      const s = `${year}-01-01`;
+      const e = `${year}-12-31`;
+      return {
+        startDate: s < minD ? minD : s,
+        endDate: e > maxD ? maxD : e,
+      };
+    }
+    return { startDate: dateRange.startDate || minD, endDate: dateRange.endDate || maxD };
+  }
+
+  function handleModeSelect(newMode) {
+    setFilterMode(newMode);
+    if (newMode !== 'custom') {
+      const dates = getPresetDates(newMode);
+      setDateRange(dates);
+    }
+  }
+
+  function handleMonthChange(newMonth) {
+    setSelectedMonth(newMonth);
+    setFilterMode('month');
+    const dates = getPresetDates('month', { month: newMonth });
+    setDateRange(dates);
+  }
+
+  function handleQuarterChange(newQuarter) {
+    setSelectedQuarter(newQuarter);
+    setFilterMode('quarter');
+    const dates = getPresetDates('quarter', { quarter: newQuarter });
+    setDateRange(dates);
+  }
+
+  function handleYearChange(newYear) {
+    setSelectedYear(newYear);
+    setFilterMode('year');
+    const dates = getPresetDates('year', { year: newYear });
+    setDateRange(dates);
+  }
+
+  function handleCustomStart(val) {
+    setFilterMode('custom');
+    setDateRange((prev) => ({
+      ...prev,
+      startDate: val,
+      endDate: prev.endDate || dateBounds.maxDate,
+    }));
+  }
+
+  function handleCustomEnd(val) {
+    setFilterMode('custom');
+    setDateRange((prev) => ({
+      ...prev,
+      startDate: prev.startDate || dateBounds.minDate,
+      endDate: val,
+    }));
+  }
+
+  // Load employee analytics details (re-fetches when employee ID or date range changes)
   useEffect(() => {
     if (!employee?.id) return;
     setLoadingDetail(true);
     api
-      .getEmployeeDetail(employee.id, {})
+      .getEmployeeDetail(employee.id, {
+        startDate: dateRange.startDate || undefined,
+        endDate: dateRange.endDate || undefined,
+      })
       .then((data) => {
         setDetail(data);
         if (data?.employee) {
@@ -65,7 +190,7 @@ export default function EmployeePortalPage({
         showToast?.(err.message || 'Failed to load performance metrics.');
       })
       .finally(() => setLoadingDetail(false));
-  }, [employee?.id, showToast]);
+  }, [employee?.id, dateRange.startDate, dateRange.endDate, showToast]);
 
   // Handle Minimal-Resolution Profile Picture Upload
   async function handleFileSelected(e) {
@@ -366,6 +491,172 @@ export default function EmployeePortalPage({
               >
                 <CheckCircle2 size={13} /> {uploadFeedback}
               </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Dashboard Analytics Period Filter Bar */}
+      <div className="emp-filter-card">
+        <div className="emp-filter-toprow">
+          <div className="emp-filter-title">
+            <Filter size={16} color="#6d28d9" />
+            <span>Dashboard Period Filter</span>
+          </div>
+
+          {/* Mode Selection Pills */}
+          <div className="emp-filter-modes">
+            <button
+              type="button"
+              className={`emp-filter-mode-btn ${filterMode === 'full' ? 'active' : ''}`}
+              onClick={() => handleModeSelect('full')}
+            >
+              <Globe size={13} /> Full Time
+            </button>
+
+            <button
+              type="button"
+              className={`emp-filter-mode-btn ${filterMode === 'month' ? 'active' : ''}`}
+              onClick={() => handleModeSelect('month')}
+            >
+              <Calendar size={13} /> Monthly
+            </button>
+
+            <button
+              type="button"
+              className={`emp-filter-mode-btn ${filterMode === 'quarter' ? 'active' : ''}`}
+              onClick={() => handleModeSelect('quarter')}
+            >
+              <Layers size={13} /> Quarterly
+            </button>
+
+            <button
+              type="button"
+              className={`emp-filter-mode-btn ${filterMode === 'year' ? 'active' : ''}`}
+              onClick={() => handleModeSelect('year')}
+            >
+              <Clock size={13} /> Yearly
+            </button>
+
+            <button
+              type="button"
+              className={`emp-filter-mode-btn ${filterMode === 'custom' ? 'active' : ''}`}
+              onClick={() => handleModeSelect('custom')}
+            >
+              <Calendar size={13} /> Custom Dates
+            </button>
+          </div>
+        </div>
+
+        {/* Dynamic Sub-Row with Period Selectors & Date Range */}
+        <div className="emp-filter-subrow">
+          <div className="emp-filter-controls-group">
+            {filterMode === 'month' && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
+                  Month:
+                </span>
+                <select
+                  className="select"
+                  value={selectedMonth}
+                  onChange={(e) => handleMonthChange(e.target.value)}
+                  style={{ padding: '5px 12px', fontSize: 12.5, fontWeight: 600 }}
+                >
+                  <option value="2026-11">November 2026 (Current)</option>
+                  <option value="2026-10">October 2026</option>
+                  <option value="2026-09">September 2026</option>
+                  <option value="2026-08">August 2026</option>
+                  <option value="2026-07">July 2026</option>
+                </select>
+              </div>
+            )}
+
+            {filterMode === 'quarter' && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
+                  Quarter:
+                </span>
+                <select
+                  className="select"
+                  value={selectedQuarter}
+                  onChange={(e) => handleQuarterChange(e.target.value)}
+                  style={{ padding: '5px 12px', fontSize: 12.5, fontWeight: 600 }}
+                >
+                  <option value="2026-Q4">Q4 2026 (Oct – Dec)</option>
+                  <option value="2026-Q3">Q3 2026 (Jul – Sep)</option>
+                  <option value="2026-Q2">Q2 2026 (Apr – Jun)</option>
+                  <option value="2026-Q1">Q1 2026 (Jan – Mar)</option>
+                </select>
+              </div>
+            )}
+
+            {filterMode === 'year' && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
+                  Year:
+                </span>
+                <select
+                  className="select"
+                  value={selectedYear}
+                  onChange={(e) => handleYearChange(e.target.value)}
+                  style={{ padding: '5px 12px', fontSize: 12.5, fontWeight: 600 }}
+                >
+                  <option value="2026">Year 2026 (Current)</option>
+                  <option value="2025">Year 2025</option>
+                </select>
+              </div>
+            )}
+
+            {/* Date Pickers */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>From:</span>
+              <input
+                type="date"
+                className="emp-filter-date-input"
+                value={dateRange.startDate || dateBounds.minDate}
+                min={dateBounds.minDate}
+                max={dateRange.endDate || dateBounds.maxDate}
+                onChange={(e) => handleCustomStart(e.target.value)}
+              />
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>To:</span>
+              <input
+                type="date"
+                className="emp-filter-date-input"
+                value={dateRange.endDate || dateBounds.maxDate}
+                min={dateRange.startDate || dateBounds.minDate}
+                max={dateBounds.maxDate}
+                onChange={(e) => handleCustomEnd(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Active Period Badge & Status */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            {loadingDetail ? (
+              <span style={{ fontSize: 12, color: '#6d28d9', fontWeight: 600 }}>
+                Updating analytics...
+              </span>
+            ) : (
+              <span className="emp-filter-active-badge">
+                <Calendar size={13} />
+                <span>
+                  {formatDate(dateRange.startDate || dateBounds.minDate)} –{' '}
+                  {formatDate(dateRange.endDate || dateBounds.maxDate)}
+                  {detail?.activeRange?.days ? ` (${detail.activeRange.days} days)` : ''}
+                </span>
+              </span>
+            )}
+
+            {filterMode !== 'full' && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: '4px 10px', fontSize: 11.5, borderRadius: 8 }}
+                onClick={() => handleModeSelect('full')}
+                title="Reset to Full Time"
+              >
+                Reset to Full Time
+              </button>
             )}
           </div>
         </div>

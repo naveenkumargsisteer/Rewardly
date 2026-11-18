@@ -405,34 +405,60 @@ async function getEmployeeDetail(employeeId, { startDate, endDate } = {}) {
   const targetEmp = allEmployees.find((e) => e.id === employeeId || e.emp_code === employeeId);
   if (!targetEmp) return null;
 
+  // For monthly progression trend, ensure at least trailing 4-5 months if a single month or narrow range is filtered
+  let trendStart = resolvedStart;
+  const rawBuckets = buildMonthBuckets(resolvedStart, resolvedEnd);
+  if (rawBuckets.length <= 1) {
+    const d = new Date(`${resolvedEnd}T00:00:00Z`);
+    d.setUTCMonth(d.getUTCMonth() - 4);
+    const trailingStart = d.toISOString().slice(0, 7) + '-01';
+    trendStart = trailingStart < meta.dateBounds.minDate ? meta.dateBounds.minDate : trailingStart;
+  }
+  const fetchStart = trendStart < resolvedStart ? trendStart : resolvedStart;
+
   const periodData = await repo.getPeriodData({
-    startDate: resolvedStart,
+    startDate: fetchStart,
     endDate: resolvedEnd,
     departmentCode: 'all',
   });
 
+  // Filter records strictly within [resolvedStart, resolvedEnd] for the employee's current period score
+  const activePeriodSales = periodData.sales.filter((s) => s.sale_date >= resolvedStart && s.sale_date <= resolvedEnd);
+  const activePeriodAtt = periodData.attendance.filter((a) => a.attendance_date >= resolvedStart && a.attendance_date <= resolvedEnd);
+  const activePeriodFb = periodData.feedback.filter((f) => f.feedback_date >= resolvedStart && f.feedback_date <= resolvedEnd);
+  const activePeriodRec = periodData.recognitions.filter((r) => r.recognition_date >= resolvedStart && r.recognition_date <= resolvedEnd);
+
   const allScored = scoreEmployees({
     employees: allEmployees,
     departments,
-    ...periodData,
+    sales: activePeriodSales,
+    attendance: activePeriodAtt,
+    feedback: activePeriodFb,
+    recognitions: activePeriodRec,
     settings,
     startDate: resolvedStart,
     endDate: resolvedEnd,
   });
 
   const employeeSummary = allScored.find((e) => e.id === targetEmp.id);
-  const empSales = periodData.sales.filter((s) => s.employee_id === targetEmp.id);
-  const empAtt = periodData.attendance.filter((a) => a.employee_id === targetEmp.id);
-  const empFb = periodData.feedback.filter((f) => f.employee_id === targetEmp.id);
-  const empRec = periodData.recognitions.filter((r) => r.employee_id === targetEmp.id);
+  const empSales = activePeriodSales.filter((s) => s.employee_id === targetEmp.id);
+  const empAtt = activePeriodAtt.filter((a) => a.employee_id === targetEmp.id);
+  const empFb = activePeriodFb.filter((f) => f.employee_id === targetEmp.id);
+  const empRec = activePeriodRec.filter((r) => r.employee_id === targetEmp.id);
 
-  // Monthly progression for this employee
-  const buckets = buildMonthBuckets(resolvedStart, resolvedEnd);
+  // For progression buckets, use all employee records in periodData (from fetchStart to resolvedEnd)
+  const allEmpSales = periodData.sales.filter((s) => s.employee_id === targetEmp.id);
+  const allEmpAtt = periodData.attendance.filter((a) => a.employee_id === targetEmp.id);
+  const allEmpFb = periodData.feedback.filter((f) => f.employee_id === targetEmp.id);
+  const allEmpRec = periodData.recognitions.filter((r) => r.employee_id === targetEmp.id);
+
+  // Monthly progression across trend buckets
+  const buckets = buildMonthBuckets(trendStart, resolvedEnd);
   const monthlyProgression = buckets.map((b) => {
-    const ms = empSales.filter((r) => r.sale_date >= b.startDate && r.sale_date <= b.endDate);
-    const ma = empAtt.filter((r) => r.attendance_date >= b.startDate && r.attendance_date <= b.endDate);
-    const mf = empFb.filter((r) => r.feedback_date >= b.startDate && r.feedback_date <= b.endDate);
-    const mr = empRec.filter((r) => r.recognition_date >= b.startDate && r.recognition_date <= b.endDate);
+    const ms = allEmpSales.filter((r) => r.sale_date >= b.startDate && r.sale_date <= b.endDate);
+    const ma = allEmpAtt.filter((r) => r.attendance_date >= b.startDate && r.attendance_date <= b.endDate);
+    const mf = allEmpFb.filter((r) => r.feedback_date >= b.startDate && r.feedback_date <= b.endDate);
+    const mr = allEmpRec.filter((r) => r.recognition_date >= b.startDate && r.recognition_date <= b.endDate);
     const [scored] = scoreEmployees({
       employees: [targetEmp],
       departments,
