@@ -61,6 +61,7 @@ function scoreEmployees({
   const wSales = Number(settings.sales_weight ?? 20);
   const wAtt = Number(settings.attendance_weight ?? 70);
   const wFb = Number(settings.feedback_weight ?? 10);
+  const wRec = 0;
   const totalW = Math.max(1, wSales + wAtt + wFb);
 
   const benchmarkRecPoints = Math.max(30, (daysInRange / 30) * 125);
@@ -197,12 +198,12 @@ function scoreEmployees({
       },
       formulaBreakdown: {
         formulaText,
-        weights: { sales: wSales, attendance: wAtt, feedback: wFb, recognition: wRec },
+        weights: { sales: wSales, attendance: wAtt, feedback: wFb, recognition: 0 },
         contributions: {
-          sales: round2((salesScore * wSales) / totalW),
           attendance: round2((attendanceScore * wAtt) / totalW),
+          sales: round2((salesScore * wSales) / totalW),
           feedback: round2((feedbackScore * wFb) / totalW),
-          recognition: round2((recognitionScore * wRec) / totalW),
+          recognition: 0,
         },
       },
     };
