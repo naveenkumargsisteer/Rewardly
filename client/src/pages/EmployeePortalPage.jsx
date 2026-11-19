@@ -28,6 +28,20 @@ import { api, compressImageToMinimalResolution, formatDate, formatInr } from '..
 import EmployeeAvatar from '../components/EmployeeAvatar';
 import RewardlyLoader from '../components/RewardlyLoader';
 
+function SkeletonBox({ width = '100%', height = 16, style = {}, borderRadius = 8 }) {
+  return (
+    <div
+      className="skeleton-box"
+      style={{
+        width,
+        height,
+        borderRadius,
+        ...style,
+      }}
+    />
+  );
+}
+
 export default function EmployeePortalPage({
   employee: initialEmployee,
   onLogout,
@@ -130,6 +144,7 @@ export default function EmployeePortalPage({
   }
 
   function handleModeSelect(newMode) {
+    setLoadingDetail(true);
     setFilterMode(newMode);
     if (newMode !== 'custom') {
       const dates = getPresetDates(newMode);
@@ -138,6 +153,7 @@ export default function EmployeePortalPage({
   }
 
   function handleMonthChange(newMonth) {
+    setLoadingDetail(true);
     setSelectedMonth(newMonth);
     setFilterMode('month');
     const dates = getPresetDates('month', { month: newMonth });
@@ -145,6 +161,7 @@ export default function EmployeePortalPage({
   }
 
   function handleQuarterChange(newQuarter) {
+    setLoadingDetail(true);
     setSelectedQuarter(newQuarter);
     setFilterMode('quarter');
     const dates = getPresetDates('quarter', { quarter: newQuarter });
@@ -152,6 +169,7 @@ export default function EmployeePortalPage({
   }
 
   function handleYearChange(newYear) {
+    setLoadingDetail(true);
     setSelectedYear(newYear);
     setFilterMode('year');
     const dates = getPresetDates('year', { year: newYear });
@@ -159,6 +177,7 @@ export default function EmployeePortalPage({
   }
 
   function handleCustomStart(val) {
+    setLoadingDetail(true);
     setFilterMode('custom');
     setDateRange((prev) => ({
       ...prev,
@@ -168,6 +187,7 @@ export default function EmployeePortalPage({
   }
 
   function handleCustomEnd(val) {
+    setLoadingDetail(true);
     setFilterMode('custom');
     setDateRange((prev) => ({
       ...prev,
@@ -548,209 +568,13 @@ export default function EmployeePortalPage({
             )}
           </div>
         </div>
-      </div>
 
-      {/* Dashboard Analytics Period Filter Bar */}
-      <div className="emp-filter-card">
-        <div className="emp-filter-toprow">
-          <div className="emp-filter-title">
-            <Filter size={16} color="#6d28d9" />
-            <span>Dashboard Period Filter</span>
-          </div>
-
-          {/* Mode Selection Pills */}
-          <div className="emp-filter-modes">
-            <button
-              type="button"
-              className={`emp-filter-mode-btn ${filterMode === 'today' ? 'active' : ''}`}
-              onClick={() => handleModeSelect('today')}
-            >
-              <Zap size={13} /> Today
-            </button>
-
-            <button
-              type="button"
-              className={`emp-filter-mode-btn ${filterMode === 'month' ? 'active' : ''}`}
-              onClick={() => handleModeSelect('month')}
-            >
-              <Calendar size={13} /> Monthly
-            </button>
-
-            <button
-              type="button"
-              className={`emp-filter-mode-btn ${filterMode === 'quarter' ? 'active' : ''}`}
-              onClick={() => handleModeSelect('quarter')}
-            >
-              <Layers size={13} /> Quarterly
-            </button>
-
-            <button
-              type="button"
-              className={`emp-filter-mode-btn ${filterMode === 'year' ? 'active' : ''}`}
-              onClick={() => handleModeSelect('year')}
-            >
-              <Clock size={13} /> Yearly
-            </button>
-
-            <button
-              type="button"
-              className={`emp-filter-mode-btn ${filterMode === 'full' ? 'active' : ''}`}
-              onClick={() => handleModeSelect('full')}
-            >
-              <Globe size={13} /> Full Time
-            </button>
-
-            <button
-              type="button"
-              className={`emp-filter-mode-btn ${filterMode === 'custom' ? 'active' : ''}`}
-              onClick={() => handleModeSelect('custom')}
-            >
-              <Calendar size={13} /> Custom Dates
-            </button>
-          </div>
-        </div>
-
-        {/* Dynamic Sub-Row with Period Selectors & Date Range */}
-        <div className="emp-filter-subrow">
-          <div className="emp-filter-controls-group">
-            {filterMode === 'today' && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: '#0284c7',
-                    background: '#e0f2fe',
-                    padding: '4px 10px',
-                    borderRadius: 8,
-                  }}
-                >
-                  <Zap size={12} color="#0284c7" />
-                  Today&apos;s Live Sales & Shift ({formatDate(dateRange.startDate || dateBounds.maxDate)})
-                </span>
-              </div>
-            )}
-
-            {filterMode === 'month' && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
-                  Month:
-                </span>
-                <select
-                  className="select"
-                  value={selectedMonth}
-                  onChange={(e) => handleMonthChange(e.target.value)}
-                  style={{ padding: '5px 12px', fontSize: 12.5, fontWeight: 600 }}
-                >
-                  <option value="2026-11">November 2026 (Current)</option>
-                  <option value="2026-10">October 2026</option>
-                  <option value="2026-09">September 2026</option>
-                  <option value="2026-08">August 2026</option>
-                  <option value="2026-07">July 2026</option>
-                </select>
-              </div>
-            )}
-
-            {filterMode === 'quarter' && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
-                  Quarter:
-                </span>
-                <select
-                  className="select"
-                  value={selectedQuarter}
-                  onChange={(e) => handleQuarterChange(e.target.value)}
-                  style={{ padding: '5px 12px', fontSize: 12.5, fontWeight: 600 }}
-                >
-                  <option value="2026-Q4">Q4 2026 (Oct – Dec)</option>
-                  <option value="2026-Q3">Q3 2026 (Jul – Sep)</option>
-                  <option value="2026-Q2">Q2 2026 (Apr – Jun)</option>
-                  <option value="2026-Q1">Q1 2026 (Jan – Mar)</option>
-                </select>
-              </div>
-            )}
-
-            {filterMode === 'year' && (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
-                  Year:
-                </span>
-                <select
-                  className="select"
-                  value={selectedYear}
-                  onChange={(e) => handleYearChange(e.target.value)}
-                  style={{ padding: '5px 12px', fontSize: 12.5, fontWeight: 600 }}
-                >
-                  <option value="2026">Year 2026 (Current)</option>
-                  <option value="2025">Year 2025</option>
-                </select>
-              </div>
-            )}
-
-            {/* Date Pickers */}
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>From:</span>
-              <input
-                type="date"
-                className="emp-filter-date-input"
-                value={dateRange.startDate || dateBounds.minDate}
-                min={dateBounds.minDate}
-                max={dateRange.endDate || dateBounds.maxDate}
-                onChange={(e) => handleCustomStart(e.target.value)}
-              />
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>To:</span>
-              <input
-                type="date"
-                className="emp-filter-date-input"
-                value={dateRange.endDate || dateBounds.maxDate}
-                min={dateRange.startDate || dateBounds.minDate}
-                max={dateBounds.maxDate}
-                onChange={(e) => handleCustomEnd(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Active Period Badge & Status */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            {loadingDetail ? (
-              <span style={{ fontSize: 12, color: '#6d28d9', fontWeight: 600 }}>
-                Updating analytics...
-              </span>
-            ) : (
-              <span className="emp-filter-active-badge">
-                <Calendar size={13} />
-                <span>
-                  {formatDate(dateRange.startDate || dateBounds.minDate)} –{' '}
-                  {formatDate(dateRange.endDate || dateBounds.maxDate)}
-                  {detail?.activeRange?.days ? ` (${detail.activeRange.days} days)` : ''}
-                </span>
-              </span>
-            )}
-
-            {filterMode !== 'full' && (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ padding: '4px 10px', fontSize: 11.5, borderRadius: 8 }}
-                onClick={() => handleModeSelect('full')}
-                title="Reset to Full Time"
-              >
-                Reset to Full Time
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Top 4 KPI Metrics Row (Full Width) */}
-      <div className="emp-kpi-grid-4">
-        {/* Composite Score Card */}
-        <div className="card" style={{ padding: 18 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>Composite Score</span>
+        {/* Composite Score in Purple Hero Banner */}
+        <div className="emp-portal-composite-banner-card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#e9d5ff', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              Composite Score
+            </span>
             <span
               style={{
                 display: 'inline-flex',
@@ -758,249 +582,606 @@ export default function EmployeePortalPage({
                 gap: 4,
                 fontSize: 10,
                 fontWeight: 700,
-                color: '#7c3aed',
-                background: 'rgba(124, 58, 237, 0.1)',
-                padding: '2px 7px',
+                color: '#34d399',
+                background: 'rgba(16, 185, 129, 0.2)',
+                border: '1px solid rgba(52, 211, 153, 0.4)',
+                padding: '2px 8px',
                 borderRadius: 12,
               }}
-              title="Auto-updates live when new bills or customer ratings are submitted"
+              title="Real-time composite score based on showroom target weightage"
             >
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed', display: 'inline-block', boxShadow: '0 0 6px #7c3aed' }}></span>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'inline-block', boxShadow: '0 0 6px #34d399' }}></span>
               Real-Time
             </span>
           </div>
+
           <div
             style={{
-              fontSize: 28,
-              fontWeight: 800,
-              color: '#6d28d9',
-              margin: '6px 0 2px',
+              fontSize: 34,
+              fontWeight: 900,
+              color: '#ffffff',
+              margin: '4px 0 2px',
+              letterSpacing: '-0.02em',
             }}
           >
             {scores.compositeScore != null ? `${scores.compositeScore}%` : '85%'}
           </div>
-          <div style={{ fontSize: 11.5, color: '#10b981', fontWeight: 600 }}>
-            Rank #{detail?.employee?.rank || 1} in Showroom
-          </div>
-        </div>
 
-        {/* Net Sales Achieved Card */}
-        <div className="card" style={{ padding: 18 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>Net Sales Achieved</span>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                fontSize: 10,
-                fontWeight: 700,
-                color: '#059669',
-                background: 'rgba(16, 185, 129, 0.12)',
-                padding: '2px 7px',
-                borderRadius: 12,
-              }}
-              title="Auto-updates live as bills are generated at cashier counter"
-            >
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 6px #10b981' }}></span>
-              Real-Time
-            </span>
-          </div>
-          <div
-            style={{
-              fontSize: 24,
-              fontWeight: 800,
-              color: 'var(--text)',
-              margin: '6px 0 2px',
-            }}
-          >
-            {metrics.netSalesInr != null ? formatInr(metrics.netSalesInr) : '₹0'}
-          </div>
-          <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-            Target Completion: {scores.salesScore != null ? `${scores.salesScore}%` : '0%'}
-          </div>
-        </div>
-
-        {/* Customer Rating Card */}
-        <div className="card" style={{ padding: 18 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-            Customer Rating
-          </div>
-          <div
-            style={{
-              fontSize: 24,
-              fontWeight: 800,
-              color: '#f59e0b',
-              margin: '6px 0 2px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-            }}
-          >
-            <Star size={20} fill="#f59e0b" color="#f59e0b" />
-            <span>
-              {metrics.avgCustomerRating != null ? metrics.avgCustomerRating.toFixed(1) : '4.8'}
-            </span>
-            <span style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 500 }}>
-              / 5.0
-            </span>
-          </div>
-          <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-            {metrics.feedbackCount || 0} customer reviews
-          </div>
-        </div>
-
-        {/* Attendance & Punctuality Card */}
-        <div
-          className="card"
-          style={{
-            padding: 18,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-              Attendance &amp; Punctuality
-            </div>
-            <div
-              style={{
-                fontSize: 24,
-                fontWeight: 800,
-                color: '#10b981',
-                margin: '6px 0 2px',
-              }}
-            >
-              {scores.attendanceScore != null ? `${scores.attendanceScore}%` : '98%'}
-            </div>
-          </div>
-          <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-            {metrics.attendanceDaysPresent ?? 92} / {metrics.attendanceDaysExpected ?? 94} days
-            present
+          <div style={{ fontSize: 12, color: '#fef08a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Award size={14} color="#fef08a" />
+            <span>Rank #{detail?.employee?.rank || 1} in Showroom</span>
           </div>
         </div>
       </div>
 
-      {/* Main Grid: Left Column (Feedback + Improvement Chart) | Right Column (Recognitions + Profile) */}
-      <div className="emp-portal-grid">
-        {/* Left Column: Recent Customer Feedback + Month-Wise Improvement Line Chart */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Customer Reviews & Feedback Card */}
-          <div className="card" style={{ padding: 22 }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 16,
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
-                Recent Customer Feedback ({feedbackList.length})
-              </h3>
+      {/* FILTERED ANALYTICS BLOCK: Updates per period filter with skeleton loaders */}
+      <div className="emp-filtered-container">
+        {/* Dashboard Analytics Period Filter Bar */}
+        <div className="emp-filter-card">
+          <div className="emp-filter-toprow">
+            <div className="emp-filter-title">
+              <Filter size={16} color="#6d28d9" />
+              <span>Dashboard Period Filter</span>
             </div>
 
-            {loadingDetail ? (
-              <RewardlyLoader variant="compact" message="Loading customer feedback..." />
-            ) : feedbackList.length === 0 ? (
+            {/* Mode Selection Pills */}
+            <div className="emp-filter-modes">
+              <button
+                type="button"
+                className={`emp-filter-mode-btn ${filterMode === 'today' ? 'active' : ''}`}
+                onClick={() => handleModeSelect('today')}
+              >
+                <Zap size={13} /> Today
+              </button>
+
+              <button
+                type="button"
+                className={`emp-filter-mode-btn ${filterMode === 'month' ? 'active' : ''}`}
+                onClick={() => handleModeSelect('month')}
+              >
+                <Calendar size={13} /> Monthly
+              </button>
+
+              <button
+                type="button"
+                className={`emp-filter-mode-btn ${filterMode === 'quarter' ? 'active' : ''}`}
+                onClick={() => handleModeSelect('quarter')}
+              >
+                <Layers size={13} /> Quarterly
+              </button>
+
+              <button
+                type="button"
+                className={`emp-filter-mode-btn ${filterMode === 'year' ? 'active' : ''}`}
+                onClick={() => handleModeSelect('year')}
+              >
+                <Clock size={13} /> Yearly
+              </button>
+
+              <button
+                type="button"
+                className={`emp-filter-mode-btn ${filterMode === 'full' ? 'active' : ''}`}
+                onClick={() => handleModeSelect('full')}
+              >
+                <Globe size={13} /> Full Time
+              </button>
+
+              <button
+                type="button"
+                className={`emp-filter-mode-btn ${filterMode === 'custom' ? 'active' : ''}`}
+                onClick={() => handleModeSelect('custom')}
+              >
+                <Calendar size={13} /> Custom Dates
+              </button>
+            </div>
+          </div>
+
+          {/* Dynamic Sub-Row with Period Selectors & Date Range */}
+          <div className="emp-filter-subrow">
+            <div className="emp-filter-controls-group">
+              {filterMode === 'today' && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#0284c7',
+                      background: '#e0f2fe',
+                      padding: '4px 10px',
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Zap size={12} color="#0284c7" />
+                    Today&apos;s Live Sales & Shift ({formatDate(dateRange.startDate || dateBounds.maxDate)})
+                  </span>
+                </div>
+              )}
+
+              {filterMode === 'month' && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
+                    Month:
+                  </span>
+                  <select
+                    className="select"
+                    value={selectedMonth}
+                    onChange={(e) => handleMonthChange(e.target.value)}
+                    style={{ padding: '5px 12px', fontSize: 12.5, fontWeight: 600 }}
+                  >
+                    <option value="2026-11">November 2026 (Current)</option>
+                    <option value="2026-10">October 2026</option>
+                    <option value="2026-09">September 2026</option>
+                    <option value="2026-08">August 2026</option>
+                    <option value="2026-07">July 2026</option>
+                  </select>
+                </div>
+              )}
+
+              {filterMode === 'quarter' && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
+                    Quarter:
+                  </span>
+                  <select
+                    className="select"
+                    value={selectedQuarter}
+                    onChange={(e) => handleQuarterChange(e.target.value)}
+                    style={{ padding: '5px 12px', fontSize: 12.5, fontWeight: 600 }}
+                  >
+                    <option value="2026-Q4">Q4 2026 (Oct – Dec)</option>
+                    <option value="2026-Q3">Q3 2026 (Jul – Sep)</option>
+                    <option value="2026-Q2">Q2 2026 (Apr – Jun)</option>
+                    <option value="2026-Q1">Q1 2026 (Jan – Mar)</option>
+                  </select>
+                </div>
+              )}
+
+              {filterMode === 'year' && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>
+                    Year:
+                  </span>
+                  <select
+                    className="select"
+                    value={selectedYear}
+                    onChange={(e) => handleYearChange(e.target.value)}
+                    style={{ padding: '5px 12px', fontSize: 12.5, fontWeight: 600 }}
+                  >
+                    <option value="2026">Year 2026 (Current)</option>
+                    <option value="2025">Year 2025</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Date Pickers */}
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>From:</span>
+                <input
+                  type="date"
+                  className="emp-filter-date-input"
+                  value={dateRange.startDate || dateBounds.minDate}
+                  min={dateBounds.minDate}
+                  max={dateRange.endDate || dateBounds.maxDate}
+                  onChange={(e) => handleCustomStart(e.target.value)}
+                />
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>To:</span>
+                <input
+                  type="date"
+                  className="emp-filter-date-input"
+                  value={dateRange.endDate || dateBounds.maxDate}
+                  min={dateRange.startDate || dateBounds.minDate}
+                  max={dateBounds.maxDate}
+                  onChange={(e) => handleCustomEnd(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Active Period Badge & Status */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              {loadingDetail ? (
+                <span style={{ fontSize: 12, color: '#6d28d9', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span className="skeleton-box" style={{ width: 12, height: 12, borderRadius: '50%' }}></span>
+                  Updating analytics...
+                </span>
+              ) : (
+                <span className="emp-filter-active-badge">
+                  <Calendar size={13} />
+                  <span>
+                    {formatDate(dateRange.startDate || dateBounds.minDate)} –{' '}
+                    {formatDate(dateRange.endDate || dateBounds.maxDate)}
+                    {detail?.activeRange?.days ? ` (${detail.activeRange.days} days)` : ''}
+                  </span>
+                </span>
+              )}
+
+              {filterMode !== 'full' && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: 11.5, borderRadius: 8 }}
+                  onClick={() => handleModeSelect('full')}
+                  title="Reset to Full Time"
+                >
+                  Reset to Full Time
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 3-Card Filtered KPI Row */}
+        <div className="emp-kpi-grid-3">
+          {loadingDetail ? (
+            <>
+              {/* Net Sales Skeleton */}
+              <div className="card" style={{ padding: 18 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <SkeletonBox width={120} height={14} />
+                  <SkeletonBox width={60} height={14} borderRadius={12} />
+                </div>
+                <SkeletonBox width={150} height={30} style={{ margin: '8px 0' }} />
+                <SkeletonBox width={120} height={13} />
+              </div>
+
+              {/* Customer Rating Skeleton */}
+              <div className="card" style={{ padding: 18 }}>
+                <div style={{ marginBottom: 10 }}>
+                  <SkeletonBox width={110} height={14} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0' }}>
+                  <SkeletonBox width={22} height={22} borderRadius={4} />
+                  <SkeletonBox width={80} height={28} />
+                </div>
+                <SkeletonBox width={130} height={13} />
+              </div>
+
+              {/* Attendance Skeleton */}
+              <div className="card" style={{ padding: 18, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <SkeletonBox width={140} height={14} style={{ marginBottom: 10 }} />
+                  <SkeletonBox width={90} height={30} style={{ margin: '8px 0' }} />
+                </div>
+                <SkeletonBox width={150} height={13} />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Net Sales Achieved Card */}
+              <div className="card" style={{ padding: 18 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Net Sales Achieved</span>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: '#059669',
+                      background: 'rgba(16, 185, 129, 0.12)',
+                      padding: '2px 7px',
+                      borderRadius: 12,
+                    }}
+                    title="Auto-updates live as bills are generated at cashier counter"
+                  >
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 6px #10b981' }}></span>
+                    Real-Time
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 800,
+                    color: 'var(--text)',
+                    margin: '6px 0 2px',
+                  }}
+                >
+                  {metrics.netSalesInr != null ? formatInr(metrics.netSalesInr) : '₹0'}
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                  Target Completion: {scores.salesScore != null ? `${scores.salesScore}%` : '0%'}
+                </div>
+              </div>
+
+              {/* Customer Rating Card */}
+              <div className="card" style={{ padding: 18 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
+                  Customer Rating
+                </div>
+                <div
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 800,
+                    color: '#f59e0b',
+                    margin: '6px 0 2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Star size={20} fill="#f59e0b" color="#f59e0b" />
+                  <span>
+                    {metrics.avgCustomerRating != null ? metrics.avgCustomerRating.toFixed(1) : '4.8'}
+                  </span>
+                  <span style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 500 }}>
+                    / 5.0
+                  </span>
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                  {metrics.feedbackCount || 0} customer reviews
+                </div>
+              </div>
+
+              {/* Attendance & Punctuality Card */}
               <div
+                className="card"
                 style={{
-                  textAlign: 'center',
-                  padding: '30px 10px',
-                  color: 'var(--text-muted)',
-                  fontSize: 13,
+                  padding: 18,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
                 }}
               >
-                No customer ratings submitted yet for your assistance.
-                <br />
-                Direct ratings will appear here as customers scan the QR code on their billing receipt.
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {feedbackList.map((fb) => (
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
+                    Attendance &amp; Punctuality
+                  </div>
                   <div
-                    key={fb.id}
                     style={{
-                      padding: '12px 14px',
+                      fontSize: 24,
+                      fontWeight: 800,
+                      color: '#10b981',
+                      margin: '6px 0 2px',
+                    }}
+                  >
+                    {scores.attendanceScore != null ? `${scores.attendanceScore}%` : '98%'}
+                  </div>
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                  {metrics.attendanceDaysPresent ?? 92} / {metrics.attendanceDaysExpected ?? 94} days
+                  present
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Filtered Activity Row: Feedback & Recognitions */}
+        <div className="emp-portal-grid">
+          {/* Customer Reviews & Feedback Card */}
+          {loadingDetail ? (
+            <div className="card" style={{ padding: 22 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <SkeletonBox width={180} height={18} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[1, 2].map((i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: '14px',
                       borderRadius: 12,
                       background: '#f8f9fd',
                       border: '1px solid var(--border)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
                     }}
                   >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                      }}
-                    >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <strong style={{ fontSize: 13.5 }}>{fb.customer_name || 'Customer'}</strong>
-                        {fb.sentiment && (
-                          <span
-                            className={`status-badge status-${fb.sentiment === 'Positive' ? 'Approved' : fb.sentiment === 'Neutral' ? 'Pending' : 'Rejected'}`}
-                            style={{ fontSize: 10.5, padding: '1px 8px' }}
-                          >
-                            {fb.sentiment}
-                          </span>
-                        )}
+                        <SkeletonBox width={120} height={16} />
+                        <SkeletonBox width={55} height={14} borderRadius={10} />
                       </div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 3,
-                          color: '#f59e0b',
-                          fontWeight: 700,
-                          fontSize: 13,
-                        }}
-                      >
-                        <Star size={14} fill="#f59e0b" />
-                        <span>{fb.rating} / 5</span>
-                      </div>
+                      <SkeletonBox width={50} height={16} />
                     </div>
-
-                    {/* Customer Feedback Message / Comment */}
-                    {(fb.comment || fb.notes || fb.message) ? (
-                      <div
-                        style={{
-                          margin: '8px 0 4px',
-                          padding: '8px 12px',
-                          background: '#ffffff',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: 8,
-                          fontSize: 12.5,
-                          color: '#1e293b',
-                          lineHeight: 1.45,
-                        }}
-                      >
-                        <span style={{ color: '#6d28d9', fontWeight: 700, marginRight: 6 }}>
-                          💬 Customer Message:
-                        </span>
-                        <span>&ldquo;{fb.comment || fb.notes || fb.message}&rdquo;</span>
-                      </div>
-                    ) : (
-                      <div style={{ margin: '4px 0', fontSize: 11.5, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                        (Customer rated without written comments)
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                      <span>{formatDate(fb.created_at || fb.feedback_date || fb.date)}</span>
-                      {fb.channel && fb.channel.includes('[bill:') && (
-                        <span style={{ color: '#6d28d9', fontWeight: 600 }}>
-                          {fb.channel.match(/\[bill:\s*([^\]]+)\]/)?.[1] ? `Bill #${fb.channel.match(/\[bill:\s*([^\]]+)\]/)[1]}` : ''}
-                        </span>
-                      )}
+                    <SkeletonBox width="92%" height={14} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <SkeletonBox width={80} height={12} />
+                      <SkeletonBox width={70} height={12} />
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="card" style={{ padding: 22 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 16,
+                }}
+              >
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
+                  Recent Customer Feedback ({feedbackList.length})
+                </h3>
+              </div>
 
-          {/* Month-Wise Improvement Line Chart Card */}
+              {feedbackList.length === 0 ? (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    padding: '30px 10px',
+                    color: 'var(--text-muted)',
+                    fontSize: 13,
+                  }}
+                >
+                  No customer ratings submitted yet for your assistance.
+                  <br />
+                  Direct ratings will appear here as customers scan the QR code on their billing receipt.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {feedbackList.map((fb) => (
+                    <div
+                      key={fb.id}
+                      style={{
+                        padding: '12px 14px',
+                        borderRadius: 12,
+                        background: '#f8f9fd',
+                        border: '1px solid var(--border)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <strong style={{ fontSize: 13.5 }}>{fb.customer_name || 'Customer'}</strong>
+                          {fb.sentiment && (
+                            <span
+                              className={`status-badge status-${fb.sentiment === 'Positive' ? 'Approved' : fb.sentiment === 'Neutral' ? 'Pending' : 'Rejected'}`}
+                              style={{ fontSize: 10.5, padding: '1px 8px' }}
+                            >
+                              {fb.sentiment}
+                            </span>
+                          )}
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 3,
+                            color: '#f59e0b',
+                            fontWeight: 700,
+                            fontSize: 13,
+                          }}
+                        >
+                          <Star size={14} fill="#f59e0b" />
+                          <span>{fb.rating} / 5</span>
+                        </div>
+                      </div>
+
+                      {/* Customer Feedback Message / Comment */}
+                      {(fb.comment || fb.notes || fb.message) ? (
+                        <div
+                          style={{
+                            margin: '8px 0 4px',
+                            padding: '8px 12px',
+                            background: '#ffffff',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: 8,
+                            fontSize: 12.5,
+                            color: '#1e293b',
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          <span style={{ color: '#6d28d9', fontWeight: 700, marginRight: 6 }}>
+                            💬 Customer Message:
+                          </span>
+                          <span>&ldquo;{fb.comment || fb.notes || fb.message}&rdquo;</span>
+                        </div>
+                      ) : (
+                        <div style={{ margin: '4px 0', fontSize: 11.5, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                          (Customer rated without written comments)
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                        <span>{formatDate(fb.created_at || fb.feedback_date || fb.date)}</span>
+                        {fb.channel && fb.channel.includes('[bill:') && (
+                          <span style={{ color: '#6d28d9', fontWeight: 600 }}>
+                            {fb.channel.match(/\[bill:\s*([^\]]+)\]/)?.[1] ? `Bill #${fb.channel.match(/\[bill:\s*([^\]]+)\]/)[1]}` : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Recognitions Received Card */}
+          {loadingDetail ? (
+            <div className="card" style={{ padding: 22 }}>
+              <SkeletonBox width={200} height={18} style={{ marginBottom: 16 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[1, 2].map((i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: '14px',
+                      borderRadius: 12,
+                      background: '#fdf4ff',
+                      border: '1px solid #f0abfc',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <SkeletonBox width={140} height={16} />
+                      <SkeletonBox width={70} height={14} />
+                    </div>
+                    <SkeletonBox width="88%" height={14} />
+                    <SkeletonBox width={120} height={12} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="card" style={{ padding: 22 }}>
+              <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 700 }}>
+                Peer &amp; Manager Recognitions ({recognitions.length})
+              </h3>
+              {recognitions.length === 0 ? (
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
+                  No recognitions logged in this period.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {recognitions.map((rec) => (
+                    <div
+                      key={rec.id}
+                      style={{
+                        padding: '12px 14px',
+                        borderRadius: 12,
+                        background: '#fdf4ff',
+                        border: '1px solid #f0abfc',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <strong style={{ fontSize: 13.5, color: '#86198f' }}>
+                          {rec.recognition_type} Recognition
+                        </strong>
+                        <span style={{ fontSize: 11.5, color: '#a21caf' }}>
+                          {formatDate(rec.recognition_date || rec.date)}
+                        </span>
+                      </div>
+                      <p style={{ margin: '4px 0 0', fontSize: 13, color: '#4a044e' }}>
+                        {rec.message}
+                      </p>
+                      <div style={{ fontSize: 11.5, color: '#701a75', marginTop: 4 }}>
+                        Awarded by <strong>{rec.from_name || 'Showroom Management'}</strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* LOWER SECTION: Month-Wise Improvement Line Chart + Profile Details (Outside the filter block) */}
+      <div className="emp-portal-grid" style={{ marginTop: 24 }}>
+        {/* Left: Month-Wise Improvement Line Chart */}
+        <div>
           <div className="card" style={{ padding: 22 }}>
             <div
               style={{
@@ -1143,54 +1324,8 @@ export default function EmployeePortalPage({
           </div>
         </div>
 
-        {/* Right Column: Peer & Manager Recognitions + Profile Details */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Recognitions Received Card */}
-          <div className="card" style={{ padding: 22 }}>
-            <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 700 }}>
-              Peer &amp; Manager Recognitions ({recognitions.length})
-            </h3>
-            {recognitions.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-                No recognitions logged in this period.
-              </p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {recognitions.map((rec) => (
-                  <div
-                    key={rec.id}
-                    style={{
-                      padding: '12px 14px',
-                      borderRadius: 12,
-                      background: '#fdf4ff',
-                      border: '1px solid #f0abfc',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <strong style={{ fontSize: 13.5, color: '#86198f' }}>
-                        {rec.recognition_type} Recognition
-                      </strong>
-                      <span style={{ fontSize: 11.5, color: '#a21caf' }}>
-                        {formatDate(rec.recognition_date || rec.date)}
-                      </span>
-                    </div>
-                    <p style={{ margin: '4px 0 0', fontSize: 13, color: '#4a044e' }}>
-                      {rec.message}
-                    </p>
-                    <div style={{ fontSize: 11.5, color: '#701a75', marginTop: 4 }}>
-                      Awarded by <strong>{rec.from_name || 'Showroom Management'}</strong>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        {/* Right: Profile Details */}
+        <div>
 
           {/* Profile Details Card */}
           <div className="card" style={{ padding: 22 }}>
