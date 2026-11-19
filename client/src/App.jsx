@@ -73,6 +73,7 @@ export default function App() {
   const loadMetaAndDash = useCallback(async (sDate, eDate, dept) => {
     setLoadingDash(true);
     setApiError('');
+    const startTime = Date.now();
     try {
       const metaData = await api.getMeta();
       let activeDept = dept;
@@ -85,6 +86,11 @@ export default function App() {
         setDepartment('all');
       }
       const dashData = await api.getDashboard({ startDate: sDate, endDate: eDate, department: activeDept });
+      // Ensure smooth skeleton shimmer visibility of at least 350ms when user filters
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 350) {
+        await new Promise((r) => setTimeout(r, 350 - elapsed));
+      }
       setMeta(metaData);
       setDashboard(dashData);
     } catch (err) {
