@@ -4,6 +4,7 @@ import KpiCards from '../components/KpiCards';
 import TrendChartCard from '../components/TrendChartCard';
 import DeptBarChartCard from '../components/DeptBarChartCard';
 import TopEmployeesCard from '../components/TopEmployeesCard';
+import GrowthChartCard from '../components/GrowthChartCard';
 import CustomDashboardWorkspace, { DEFAULT_CUSTOM_WIDGETS } from '../components/CustomDashboardWorkspace';
 import AiAssistantPanel from '../components/AiAssistantPanel';
 import RewardlyLoader from '../components/RewardlyLoader';
@@ -211,11 +212,15 @@ export default function DashboardPage({
                   <DeptBarChartCard departments={dashboard?.departmentBreakdown} />
                 </div>
 
-                <div style={{ marginTop: 16 }}>
+                <div className="charts-grid-2" style={{ marginTop: 16 }}>
                   <TopEmployeesCard
                     employees={dashboard?.employeesRanked}
                     onViewAll={onViewAllEmployees}
                     onSelectEmployee={onSelectEmployee}
+                  />
+                  <GrowthChartCard
+                    monthlyTrend={dashboard?.monthlyTrend}
+                    kpis={dashboard?.kpis}
                   />
                 </div>
               </>

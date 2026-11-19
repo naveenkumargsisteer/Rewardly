@@ -4,21 +4,21 @@ import { formatCompactInr } from '../api/client';
 import EmployeeAvatar from './EmployeeAvatar';
 
 export default function TopEmployeesCard({ employees, onViewAll, onSelectEmployee }) {
-  const topList = (employees || []).slice(0, 8);
+  const topList = (employees || []).slice(0, 5);
 
   return (
     <div className="card">
       <div className="card-header">
         <div className="card-title-row">
           <Trophy size={17} color="#f59e0b" />
-          <span>Top Performing Showroom Staff</span>
+          <span>Top Recognized Employees</span>
         </div>
         <button type="button" className="link-btn" onClick={onViewAll}>
           View All ({employees?.length || 0}) <ArrowRight size={13} />
         </button>
       </div>
 
-      <div className="top-emp-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 10 }}>
+      <div className="top-emp-list">
         {topList.map((emp) => (
           <div
             key={emp.id}
@@ -27,24 +27,25 @@ export default function TopEmployeesCard({ employees, onViewAll, onSelectEmploye
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter') onSelectEmployee(emp.id); }}
-            style={{ margin: 0 }}
+            style={{ margin: 0, padding: '9px 12px' }}
           >
             <div className="top-emp-left">
               <EmployeeAvatar employee={emp} size={34} />
               <div style={{ minWidth: 0 }}>
-                <div className="emp-name">
+                <div className="emp-name" style={{ fontSize: 13, fontWeight: 600 }}>
                   #{emp.rank} {emp.full_name}
                 </div>
-                <div className="emp-meta">
+                <div className="emp-meta" style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                   {emp.role} • {emp.department_name} • {formatCompactInr(emp.metrics.netSalesInr)}
                 </div>
               </div>
             </div>
-            <span className="score-pill tabular-nums">{emp.scores.compositeScore}%</span>
+            <span className="score-pill tabular-nums" style={{ fontWeight: 600 }}>
+              {emp.scores.compositeScore}%
+            </span>
           </div>
         ))}
       </div>
     </div>
   );
 }
-

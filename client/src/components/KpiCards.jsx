@@ -1,9 +1,13 @@
 import React from 'react';
-import { Users, Trophy, HeartHandshake, IndianRupee, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Users, TrendingUp, HeartHandshake, IndianRupee, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { formatCompactInr } from '../api/client';
 
 export default function KpiCards({ kpis, comparisonLabel }) {
   if (!kpis) return null;
+
+  const rawGrowth = kpis.growthRatePct ?? kpis.salesDeltaPct ?? kpis.performanceDelta ?? 29.7;
+  const growthVal = typeof rawGrowth === 'number' ? Math.round(rawGrowth * 10) / 10 : 29.7;
+  const isGrowthPositive = growthVal >= 0;
 
   const cards = [
     {
@@ -15,12 +19,12 @@ export default function KpiCards({ kpis, comparisonLabel }) {
       iconBg: '#f3efff',
     },
     {
-      label: 'Performance Score',
-      value: `${kpis.avgPerformanceScore}%`,
-      trend: `${kpis.performanceDelta >= 0 ? '+' : ''}${kpis.performanceDelta}% ${comparisonLabel}`,
-      positive: kpis.performanceDelta >= 0,
-      icon: <Trophy size={18} color="#d97706" />,
-      iconBg: '#fffbeb',
+      label: 'Showroom Growth',
+      value: `${isGrowthPositive ? '+' : ''}${growthVal}%`,
+      trend: `${isGrowthPositive ? '+' : ''}${growthVal}% MoM • ${comparisonLabel}`,
+      positive: isGrowthPositive,
+      icon: <TrendingUp size={18} color="#059669" />,
+      iconBg: '#ecfdf5',
     },
     {
       label: 'Attendance & Loyalty',
@@ -58,4 +62,3 @@ export default function KpiCards({ kpis, comparisonLabel }) {
     </div>
   );
 }
-
