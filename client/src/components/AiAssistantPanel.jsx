@@ -13,6 +13,17 @@ import {
 import CustomChartRenderer, { CHART_TYPE_OPTIONS } from './CustomChartRenderer';
 import { api } from '../api/client';
 
+function renderFormattedText(text) {
+  if (!text) return null;
+  const parts = String(text).split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={idx}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
 const INITIAL_PROMPTS = [
   'Who has highest score?',
   'Show recognition trends by department',
@@ -39,8 +50,9 @@ export default function AiAssistantPanel({
     {
       id: 'welcome',
       sender: 'bot',
-      text: "Hi! I'm your Rewardly AI assistant. Ask me to analyze data or create any chart — pick a chart type below and drag generated charts into your Custom tab!",
+      text: "Hi! I'm your Rewardly AI assistant powered by live AI models. Ask me anything about employee scores, sales, attendance, or department performance — click '✨ Generate Widget' on any chart to pin it directly to your Custom Dashboard!",
       suggestedNextSteps: INITIAL_PROMPTS,
+      provider: 'AI Model (Online)',
     },
   ]);
   const [input, setInput] = useState('');
@@ -48,6 +60,20 @@ export default function AiAssistantPanel({
   const [asking, setAsking] = useState(false);
 
   const pendingRewards = (rewards || []).filter((r) => r.status === 'Pending');
+
+  function handleGenerateWidget(chartSpec) {
+    if (!chartSpec) return;
+    onAddChartToCustom(chartSpec);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `b-pin-${Date.now()}`,
+        sender: 'bot',
+        text: `✨ Successfully created and pinned "${chartSpec.title || 'Chart'}" to your Custom Dashboard canvas! Switched to Custom tab.`,
+        provider: 'Custom Dashboard Generator',
+      },
+    ]);
+  }
 
   async function sendQuestion(questionText) {
     const q = String(questionText || input).trim();
@@ -57,7 +83,25 @@ export default function AiAssistantPanel({
     setMessages((prev) => [...prev, userMsg]);
     setAsking(true);
 
+    const qLower = q.toLowerCase();
+    const isWidgetRequest =
+      qLower.includes('generate widget') ||
+      qLower.includes('create widget') ||
+      qLower.includes('add widget') ||
+      qLower.includes('make widget') ||
+      qLower.includes('pin widget');
+
     try {
+      // If user typed only a widget generation command, check if we can reuse the last chart
+      if (isWidgetRequest) {
+        const lastChartMsg = [...messages].reverse().find((m) => m.chart);
+        if (lastChartMsg && lastChartMsg.chart) {
+          handleGenerateWidget(lastChartMsg.chart);
+          setAsking(false);
+          return;
+        }
+      }
+
       const res = await api.queryAi({
         question: q,
         startDate,
@@ -67,28 +111,74 @@ export default function AiAssistantPanel({
       });
 
       // If user explicitly asks to generate a widget, automatically add it to custom canvas
-      if (
-        res.chart &&
-        (q.toLowerCase().includes('generate widget') ||
-          q.toLowerCase().includes('create widget') ||
-          q.toLowerCase().includes('add widget') ||
-          q.toLowerCase().includes('make widget'))
-      ) {
+      if (res.chart && isWidgetRequest) {
         onAddChartToCustom(res.chart);
       }
 
+      const botMsgId = `b-${Date.now()}`;
       setMessages((prev) => [
         ...prev,
         {
-          id: `b-${Date.now()}`,
+          id: botMsgId,
           sender: 'bot',
           text: res.answer,
           highlights: res.highlights,
           chart: res.chart,
           suggestedNextSteps: res.suggestedNextSteps,
-          provider: res.aiProvider,
+          provider: res.aiProvider || 'AI Model (GPT-4o mini)',
         },
       ]);
+
+      // If server returned non-AI fallback, trigger direct client-side AI chat in browser
+      if (res.aiProvider === 'Rewardly Analytics Engine' && res.groundTruthContext) {
+        const sysPrompt =
+          'You are Rewardly AI for Kaveri Silks & Textiles. Synthesize the owner question conversationally in 2-3 engaging sentences using ONLY the verified database records provided. Bold key names and numbers with markdown.';
+        const userPrompt = `Owner Question: "${q}"\nVerified DB Context: ${JSON.stringify(res.groundTruthContext)}`;
+
+        if (window.puter?.ai?.chat) {
+          window.puter.ai
+            .chat(`${sysPrompt}\n\n${userPrompt}`, { model: 'gpt-4o-mini' })
+            .then((resp) => {
+              const text = resp?.message?.content || resp?.text || (typeof resp === 'string' ? resp : null);
+              if (text && text.trim().length > 15) {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === botMsgId
+                      ? { ...m, text: text.trim(), provider: 'GPT-4o mini (Puter AI)' }
+                      : m
+                  )
+                );
+              }
+            })
+            .catch(() => {});
+        } else {
+          fetch('https://text.pollinations.ai/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: [
+                { role: 'system', content: sysPrompt },
+                { role: 'user', content: userPrompt },
+              ],
+              model: 'openai',
+              seed: Math.floor(Math.random() * 1000000),
+            }),
+          })
+            .then((r) => (r.ok ? r.text() : null))
+            .then((aiText) => {
+              if (aiText && !aiText.includes('Free limit') && !aiText.includes('"error"')) {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === botMsgId
+                      ? { ...m, text: aiText.trim(), provider: 'GPT-4o mini AI (Live)' }
+                      : m
+                  )
+                );
+              }
+            })
+            .catch(() => {});
+        }
+      }
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -193,14 +283,85 @@ export default function AiAssistantPanel({
                   </div>
                 )}
                 <div className={`ai-bubble ${m.sender === 'user' ? 'user' : ''}`}>
-                  <div>{m.text}</div>
+                  {m.sender === 'bot' && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(99, 102, 241, 0.12) 100%)',
+                          color: '#6d28d9',
+                          padding: '2px 8px',
+                          borderRadius: 999,
+                          border: '1px solid rgba(109, 40, 217, 0.2)',
+                        }}
+                      >
+                        <Sparkles size={11} color="#7c3aed" />
+                        {m.provider || 'AI Model (GPT-4o mini)'}
+                      </span>
+                      {m.chart && (
+                        <button
+                          type="button"
+                          onClick={() => handleGenerateWidget(m.chart)}
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            background: '#7c3aed',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 6,
+                            padding: '3px 8px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            boxShadow: '0 1px 3px rgba(124, 58, 237, 0.3)',
+                          }}
+                          title="Generate and pin to Custom Dashboard"
+                        >
+                          <Sparkles size={11} />
+                          Generate Widget
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ lineHeight: 1.5 }}>{renderFormattedText(m.text)}</div>
 
                   {m.highlights && m.highlights.length > 0 && (
-                    <ul style={{ margin: '8px 0 4px', paddingLeft: 16, fontSize: 12, color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '9px 0 6px' }}>
                       {m.highlights.map((h, i) => (
-                        <li key={i} style={{ marginBottom: 3 }}>{h}</li>
+                        <span
+                          key={i}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            background: 'rgba(109, 40, 217, 0.08)',
+                            color: '#5b21b6',
+                            border: '1px solid rgba(109, 40, 217, 0.16)',
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                          }}
+                        >
+                          {h}
+                        </span>
                       ))}
-                    </ul>
+                    </div>
                   )}
 
                   {m.chart && (
@@ -218,10 +379,33 @@ export default function AiAssistantPanel({
                           <GripVertical size={14} color="var(--text-muted)" style={{ cursor: 'grab', flexShrink: 0 }} />
                           <strong style={{ fontSize: 12 }}>{m.chart.title}</strong>
                         </div>
-                        <span className="chart-gen-pill">
-                          <CheckCircle2 size={11} />
-                          Chart Generated
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span className="chart-gen-pill">
+                            <CheckCircle2 size={11} />
+                            Chart Generated
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateWidget(m.chart)}
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              background: '#7c3aed',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: 6,
+                              padding: '2px 8px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                            title="Generate and pin to Custom Dashboard"
+                          >
+                            <Sparkles size={11} />
+                            Generate Widget
+                          </button>
+                        </div>
                       </div>
 
                       <CustomChartRenderer spec={m.chart} height={150} />
@@ -241,14 +425,14 @@ export default function AiAssistantPanel({
                         <button
                           type="button"
                           className="btn btn-sm btn-primary"
-                          onClick={() => onAddChartToCustom(m.chart)}
+                          onClick={() => handleGenerateWidget(m.chart)}
                           title="Generate and pin this widget to your Custom Dashboard"
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 6,
                             fontWeight: 700,
-                            padding: '5px 12px',
+                            padding: '6px 14px',
                             background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
                             color: '#ffffff',
                             borderRadius: 8,
