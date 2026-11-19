@@ -41,19 +41,33 @@ class SupabaseRepository {
 
   async ensureSeededIfEmpty() {
     if (this._seedChecked) return;
-    const [shopsRes, empRes, salesRes] = await Promise.all([
-      this.supabase.from('shops').select('*', { count: 'exact', head: true }),
-      this.supabase.from('employees').select('*', { count: 'exact', head: true }),
-      this.supabase.from('sales_records').select('*', { count: 'exact', head: true }),
-    ]);
-    const firstErr = shopsRes.error || empRes.error || salesRes.error;
-    if (firstErr) {
-      throw new Error(`Supabase schema check error (verify schema.sql was executed): ${firstErr.message}`);
+    try {
+      const [shopsRes, empRes, salesRes] = await Promise.all([
+        this.supabase.from('shops').select('id', { count: 'exact', head: true }),
+        this.supabase.from('employees').select('id', { count: 'exact', head: true }),
+        this.supabase.from('sales_records').select('id', { count: 'exact', head: true }),
+      ]);
+      const firstErr = shopsRes.error || empRes.error || salesRes.error;
+      if (firstErr) {
+        if (firstErr.message && firstErr.message.includes('schema cache')) {
+          throw new Error(
+            `Supabase table not found in schema cache. Please open your Supabase SQL Editor and run 'supabase/schema.sql', or go to Project Settings > API and click 'Reload schema cache'. Detail: ${firstErr.message}`
+          );
+        }
+        throw new Error(`Supabase schema check error (verify schema.sql was executed): ${firstErr.message}`);
+      }
+      if ((shopsRes.count || 0) === 0 || (empRes.count || 0) === 0 || (salesRes.count || 0) === 0) {
+        await this.resetAndReseed();
+      }
+      this._seedChecked = true;
+    } catch (err) {
+      if (err.message && err.message.includes('schema cache')) {
+        throw new Error(
+          `Supabase table not found in schema cache. Please open your Supabase SQL Editor and run 'supabase/schema.sql', or go to Project Settings > API and click 'Reload schema cache'. Detail: ${err.message}`
+        );
+      }
+      throw err;
     }
-    if ((shopsRes.count || 0) === 0 || (empRes.count || 0) === 0 || (salesRes.count || 0) === 0) {
-      await this.resetAndReseed();
-    }
-    this._seedChecked = true;
   }
 
   async fetchAllPaginated(table, buildQuery) {
