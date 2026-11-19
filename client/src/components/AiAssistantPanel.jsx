@@ -14,6 +14,7 @@ import CustomChartRenderer, { CHART_TYPE_OPTIONS } from './CustomChartRenderer';
 import { api } from '../api/client';
 
 const INITIAL_PROMPTS = [
+  'Who has highest score?',
   'Show recognition trends by department',
   'Compare loyalty over time',
   'Top 10 recognized employees',
@@ -64,6 +65,18 @@ export default function AiAssistantPanel({
         department,
         chartType: selectedChartType,
       });
+
+      // If user explicitly asks to generate a widget, automatically add it to custom canvas
+      if (
+        res.chart &&
+        (q.toLowerCase().includes('generate widget') ||
+          q.toLowerCase().includes('create widget') ||
+          q.toLowerCase().includes('add widget') ||
+          q.toLowerCase().includes('make widget'))
+      ) {
+        onAddChartToCustom(res.chart);
+      }
+
       setMessages((prev) => [
         ...prev,
         {
@@ -227,11 +240,25 @@ export default function AiAssistantPanel({
 
                         <button
                           type="button"
-                          className="btn btn-soft btn-sm"
+                          className="btn btn-sm btn-primary"
                           onClick={() => onAddChartToCustom(m.chart)}
+                          title="Generate and pin this widget to your Custom Dashboard"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            fontWeight: 700,
+                            padding: '5px 12px',
+                            background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                            color: '#ffffff',
+                            borderRadius: 8,
+                            boxShadow: '0 2px 6px rgba(109, 40, 217, 0.25)',
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
                         >
-                          <Plus size={12} />
-                          Add to Custom
+                          <Sparkles size={13} />
+                          Generate Widget
                         </button>
                       </div>
                     </div>

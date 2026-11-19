@@ -105,6 +105,39 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
     Number(settings.feedback_weight || 0) +
     Number(settings.sales_weight || 0);
 
+  // Auto-balance weights so total NEVER crosses 100% and always remains 100%
+  function handleWeightChange(changedKey, rawValue) {
+    const newVal = Math.min(100, Math.max(0, Math.round(Number(rawValue) || 0)));
+    const keys = ['attendance_weight', 'feedback_weight', 'sales_weight'];
+    const otherKeys = keys.filter((k) => k !== changedKey);
+    const rem = 100 - newVal;
+
+    const currentW1 = Number(settings[otherKeys[0]] ?? 0);
+    const currentW2 = Number(settings[otherKeys[1]] ?? 0);
+    const sumOther = currentW1 + currentW2;
+
+    let nextW1 = 0;
+    let nextW2 = 0;
+
+    if (rem === 0) {
+      nextW1 = 0;
+      nextW2 = 0;
+    } else if (sumOther > 0) {
+      nextW1 = Math.round(rem * (currentW1 / sumOther));
+      nextW2 = rem - nextW1;
+    } else {
+      nextW1 = Math.floor(rem / 2);
+      nextW2 = rem - nextW1;
+    }
+
+    setSettings((prev) => ({
+      ...prev,
+      [changedKey]: newVal,
+      [otherKeys[0]]: nextW1,
+      [otherKeys[1]]: nextW2,
+    }));
+  }
+
   async function handleSaveSettings(e) {
     e?.preventDefault();
     if (totalWeight !== 100) {
@@ -197,13 +230,22 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
             <Sliders size={18} color="#6d28d9" />
             <span>Configurable Performance Score Weights</span>
           </div>
-          <span className={`status-badge ${totalWeight === 100 ? 'status-Approved' : 'status-Pending'}`}>
-            Total: {totalWeight}%
+          <span
+            className={`status-badge ${totalWeight === 100 ? 'status-Approved' : 'status-Pending'}`}
+            style={{
+              fontWeight: 700,
+              fontSize: 12,
+              background: totalWeight === 100 ? '#ecfdf5' : '#fef2f2',
+              color: totalWeight === 100 ? '#059669' : '#dc2626',
+              border: `1px solid ${totalWeight === 100 ? '#a7f3d0' : '#fecaca'}`,
+            }}
+          >
+            {totalWeight === 100 ? '✓ Total: 100% (Balanced)' : `Total: ${totalWeight}%`}
           </span>
         </div>
 
         <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 0 }}>
-          Adjust how Rewardly computes each employee&apos;s composite score across Attendance, Customer Feedback, and Sales Target. Total weights should sum to 100%.
+          Adjust how Rewardly computes each employee&apos;s composite score across Attendance, Customer Feedback, and Sales Target. Sliders automatically auto-balance so the total is always locked at 100%.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -215,7 +257,9 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
             <div className="field" key={item.key}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ fontWeight: 600 }}>{item.label}</span>
-                <strong className="tabular-nums">{settings[item.key] ?? 0}%</strong>
+                <strong className="tabular-nums" style={{ color: 'var(--primary)', fontWeight: 800 }}>
+                  {settings[item.key] ?? 0}%
+                </strong>
               </div>
               <div className="slider-row">
                 <input
@@ -223,7 +267,7 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
                   min={0}
                   max={100}
                   value={settings[item.key] ?? 0}
-                  onChange={(e) => setSettings({ ...settings, [item.key]: Number(e.target.value) })}
+                  onChange={(e) => handleWeightChange(item.key, e.target.value)}
                 />
               </div>
             </div>
@@ -276,6 +320,36 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
                 }
               >
                 80% Att / 10% FB / 10% Sales
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: 11, padding: '4px 8px' }}
+                onClick={() =>
+                  setSettings({
+                    ...settings,
+                    attendance_weight: 60,
+                    feedback_weight: 20,
+                    sales_weight: 20,
+                  })
+                }
+              >
+                60% Att / 20% FB / 20% Sales
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: 11, padding: '4px 8px' }}
+                onClick={() =>
+                  setSettings({
+                    ...settings,
+                    attendance_weight: 50,
+                    feedback_weight: 25,
+                    sales_weight: 25,
+                  })
+                }
+              >
+                50% Att / 25% FB / 25% Sales
               </button>
             </div>
           </div>

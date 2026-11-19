@@ -108,7 +108,52 @@ async function answerQuestion({ question, startDate, endDate, departmentCode = '
     (qLower.includes('billing') && d.code === 'BILL')
   );
 
-  if (matchedEmployees.length >= 2) {
+  // Check if user asks about highest score / top performer
+  const isHighestScoreQuery =
+    qLower.includes('highest') ||
+    qLower.includes('max score') ||
+    qLower.includes('top score') ||
+    qLower.includes('scrore') || // handles user's exact spelling: "who has highest scrore"
+    (qLower.includes('who') &&
+      (qLower.includes('score') ||
+        qLower.includes('lead') ||
+        qLower.includes('best') ||
+        qLower.includes('rank 1') ||
+        qLower.includes('#1') ||
+        qLower.includes('winner')));
+
+  if (isHighestScoreQuery) {
+    const topEmp = employeesRanked[0];
+    const top5 = employeesRanked.slice(0, 5);
+
+    answer = `🏆 Based on real database records (${formatDate(meta.activeRange.startDate)} to ${formatDate(meta.activeRange.endDate)}), ${topEmp.full_name} (${topEmp.emp_code}) holds the highest composite score in the showroom at ${topEmp.scores.compositeScore}% (${topEmp.scores.tier} Tier, Rank #1). As ${topEmp.role} in ${topEmp.department_name}, ${topEmp.full_name.split(' ')[0]} achieved ${formatInr(topEmp.metrics.netSalesInr)} net sales (${topEmp.metrics.targetAchievementPct}% target completion), ${topEmp.scores.attendanceScore}% attendance & punctuality, and a ${topEmp.metrics.avgRating}★ customer rating across ${topEmp.metrics.feedbackCount} reviews.`;
+
+    highlights = [
+      `🥇 Rank #1: ${topEmp.full_name} (${topEmp.department_name}) — ${topEmp.scores.compositeScore}% Composite Score (${topEmp.scores.tier} Tier)`,
+      `Net Sales Achieved: ${formatInr(topEmp.metrics.netSalesInr)} across ${topEmp.metrics.billsCount} bills (${topEmp.metrics.targetAchievementPct}% target)`,
+      `Attendance & Punctuality: ${topEmp.scores.attendanceScore}% (${topEmp.metrics.presentDays} days present)`,
+      `Customer Rating: ${topEmp.metrics.avgRating}★ (${topEmp.metrics.feedbackCount} reviews) • Recognitions: ${topEmp.metrics.recognitionCount || 0} (${topEmp.metrics.recognitionPoints || 0} pts)`,
+      `Next in Line: #${top5[1]?.rank} ${top5[1]?.full_name} (${top5[1]?.scores.compositeScore}%) and #${top5[2]?.rank} ${top5[2]?.full_name} (${top5[2]?.scores.compositeScore}%)`,
+    ];
+
+    chart = {
+      title: 'Top 5 Highest Scoring Employees (Real Database)',
+      type: 'bar',
+      labels: top5.map((e) => e.full_name.split(' ')[0]),
+      datasets: [
+        { label: 'Composite %', data: top5.map((e) => e.scores.compositeScore), color: '#7C3AED' },
+        { label: 'Sales Score %', data: top5.map((e) => e.scores.salesScore), color: '#3B82F6' },
+        { label: 'Attendance %', data: top5.map((e) => e.scores.attendanceScore), color: '#10B981' },
+      ],
+    };
+
+    suggestedNextSteps = [
+      'Show recognition trends by department',
+      'Compare loyalty over time',
+      'Who deserves a festive bonus?',
+      'Identify attendance coaching gaps',
+    ];
+  } else if (matchedEmployees.length >= 2) {
     const picked = matchedEmployees.slice(0, 4);
     answer = `Here is a side-by-side comparison for ${picked.map((e) => e.full_name).join(' vs ')} (${formatDate(meta.activeRange.startDate)} to ${formatDate(meta.activeRange.endDate)}):`;
     highlights = picked.map((e) =>
