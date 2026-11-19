@@ -603,14 +603,14 @@ export default function AiAssistantPanel({
             </div>
           ))}
 
-          {/* AI Recognition Recommendations Header */}
+          {/* AI Recognition Recommendations Header & Category Filters */}
           <div
             style={{
               marginTop: 14,
-              marginBottom: 8,
-              padding: '12px 14px',
+              marginBottom: 4,
+              padding: '14px 14px 12px',
               background: 'linear-gradient(135deg, #f8f7ff 0%, #f3f0ff 100%)',
-              borderRadius: 12,
+              borderRadius: 14,
               border: '1px solid #e9d5ff',
             }}
           >
@@ -641,70 +641,69 @@ export default function AiAssistantPanel({
                 Actionable
               </span>
             </div>
-            <p style={{ margin: 0, fontSize: 11.5, color: '#6b7280', lineHeight: 1.45 }}>
+            <p style={{ margin: '0 0 10px', fontSize: 11.5, color: '#6b7280', lineHeight: 1.45 }}>
               Suggests personalised recognition based on employee achievements.
             </p>
-          </div>
 
-          {/* 5 Award Category Pills */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 6,
-              overflowX: 'auto',
-              paddingBottom: 6,
-              marginBottom: 10,
-              scrollbarWidth: 'none',
-            }}
-          >
-            {RECOGNITION_AWARD_CATEGORIES.map((cat) => {
-              const IconComp = cat.icon;
-              const isSelected = selectedAwardCategory === cat.id;
-              const count =
-                cat.id === 'all'
-                  ? (rewards || []).length
-                  : (rewards || []).filter((r) => getRewardAwardCategory(r) === cat.label).length;
+            {/* 5 Award Category Pills (Wrapped & Never Clipped) */}
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 6,
+                paddingTop: 8,
+                borderTop: '1px solid rgba(233, 213, 255, 0.7)',
+              }}
+            >
+              {RECOGNITION_AWARD_CATEGORIES.map((cat) => {
+                const IconComp = cat.icon;
+                const isSelected = selectedAwardCategory === cat.id;
+                const count =
+                  cat.id === 'all'
+                    ? (rewards || []).length
+                    : (rewards || []).filter((r) => getRewardAwardCategory(r) === cat.label).length;
 
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setSelectedAwardCategory(cat.id)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    padding: '4px 10px',
-                    borderRadius: 20,
-                    fontSize: 11,
-                    fontWeight: isSelected ? 700 : 500,
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                    border: isSelected ? `1.5px solid ${cat.color}` : '1px solid #e2e8f0',
-                    background: isSelected ? cat.bg : '#ffffff',
-                    color: isSelected ? cat.color : '#64748b',
-                    boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
-                    transition: 'all 0.15s ease',
-                  }}
-                  title={cat.label}
-                >
-                  <IconComp size={12} color={isSelected ? cat.color : '#94a3b8'} />
-                  <span>{cat.label}</span>
-                  <span
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedAwardCategory(cat.id)}
                     style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: '1px 5px',
-                      borderRadius: 10,
-                      background: isSelected ? '#ffffff' : '#f1f5f9',
-                      color: isSelected ? cat.color : '#64748b',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      padding: '4px 10px',
+                      borderRadius: 20,
+                      fontSize: 11,
+                      fontWeight: isSelected ? 700 : 500,
+                      cursor: 'pointer',
+                      border: isSelected ? `1.5px solid ${cat.color}` : '1px solid #e2e8f0',
+                      background: isSelected ? cat.bg : '#ffffff',
+                      color: isSelected ? cat.color : '#475569',
+                      boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                      transition: 'all 0.15s ease',
+                      flexShrink: 0,
                     }}
+                    title={cat.label}
                   >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
+                    <IconComp size={12} color={isSelected ? cat.color : '#94a3b8'} />
+                    <span>{cat.label}</span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: '1px 5px',
+                        borderRadius: 10,
+                        background: isSelected ? '#ffffff' : '#f1f5f9',
+                        color: isSelected ? cat.color : '#64748b',
+                      }}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Award Recommendations List */}
