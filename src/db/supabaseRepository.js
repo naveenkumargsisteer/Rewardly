@@ -15,6 +15,8 @@ const {
   isPasswordValid,
   parseStaffTargets,
   packStaffTargets,
+  parseDeptPeriods,
+  packDeptPeriods,
 } = require('../utils/authUtils');
 
 const DEFAULT_SETTINGS = {
@@ -155,7 +157,17 @@ class SupabaseRepository {
       .select('*')
       .order('target_monthly_sales', { ascending: false });
     if (error) throw new Error(`Supabase departments error: ${error.message}`);
-    return data || [];
+    const settings = await this.getSettings();
+    const periods = parseDeptPeriods(settings?.ai_provider);
+    return (data || []).map((d) => ({
+      ...d,
+      target_period: periods[d.id] || {
+        preset: '1m',
+        months: 1,
+        startDate: '',
+        endDate: '',
+      },
+    }));
   }
 
   _formatEmployeeRow(row) {
@@ -218,7 +230,8 @@ class SupabaseRepository {
       throw httpError(409, `Department code "${clean.code}" already exists.`);
     }
 
-    const row = { id: crypto.randomUUID(), shop_id: shop.id, ...clean };
+    const id = crypto.randomUUID();
+    const row = { id, shop_id: shop.id, ...clean };
     const { data, error } = await this.supabase
       .from('departments')
       .insert(row)
@@ -229,6 +242,12 @@ class SupabaseRepository {
     if (payload.staff_targets && typeof payload.staff_targets === 'object') {
       const currentSettings = await this.getSettings();
       const updatedAi = packStaffTargets(currentSettings.ai_provider, payload.staff_targets);
+      await this.updateSettings({ ai_provider: updatedAi });
+    }
+
+    if (payload.target_period && typeof payload.target_period === 'object') {
+      const currentSettings = await this.getSettings();
+      const updatedAi = packDeptPeriods(currentSettings.ai_provider, { [id]: payload.target_period });
       await this.updateSettings({ ai_provider: updatedAi });
     }
 
@@ -244,7 +263,10 @@ class SupabaseRepository {
       }
     }
 
-    return data;
+    return {
+      ...data,
+      target_period: payload.target_period || { preset: '1m', months: 1, startDate: '', endDate: '' },
+    };
   }
 
   async updateDepartment(id, payload) {
@@ -289,6 +311,12 @@ class SupabaseRepository {
       await this.updateSettings({ ai_provider: updatedAi });
     }
 
+    if (payload.target_period && typeof payload.target_period === 'object') {
+      const currentSettings = await this.getSettings();
+      const updatedAi = packDeptPeriods(currentSettings.ai_provider, { [id]: payload.target_period });
+      await this.updateSettings({ ai_provider: updatedAi });
+    }
+
     if (Array.isArray(payload.reassigned_employees)) {
       for (const item of payload.reassigned_employees) {
         if (item && item.id && item.department_id) {
@@ -301,7 +329,10 @@ class SupabaseRepository {
       }
     }
 
-    return result;
+    return {
+      ...result,
+      target_period: payload.target_period || { preset: '1m', months: 1, startDate: '', endDate: '' },
+    };
   }
 
   async deleteDepartment(id) {
@@ -362,7 +393,8 @@ class SupabaseRepository {
       throw httpError(409, `Employee code "${clean.emp_code}" already exists.`);
     }
 
-    const row = { id: crypto.randomUUID(), shop_id: shop.id, ...clean };
+    const id = crypto.randomUUID();
+    const row = { id, shop_id: shop.id, ...clean };
     const { data, error } = await this.supabase
       .from('employees')
       .insert(row)

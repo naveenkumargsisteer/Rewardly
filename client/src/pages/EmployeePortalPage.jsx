@@ -1008,10 +1008,35 @@ export default function EmployeePortalPage({
                 }}
               >
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
-                    Department Target Contribution
-                  </h3>
-                  <div style={{ fontSize: 13.5, color: 'var(--text-muted)', marginTop: 3 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                      Department Target Contribution
+                    </h3>
+                    {deptAnalytics.targetPeriodLabel && (
+                      <span
+                        style={{
+                          background: '#f3e8ff',
+                          color: '#7c3aed',
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: 8,
+                          border: '1px solid #ddd6fe',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        📅 {deptAnalytics.targetPeriodLabel}
+                        {deptAnalytics.targetPeriodStartDate && deptAnalytics.targetPeriodEndDate && (
+                          <span style={{ fontWeight: 500, color: '#6d28d9', marginLeft: 2 }}>
+                            ({formatDate(deptAnalytics.targetPeriodStartDate)} – {formatDate(deptAnalytics.targetPeriodEndDate)})
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13.5, color: 'var(--text-muted)', marginTop: 4 }}>
                     {deptAnalytics.departmentName}
                   </div>
                 </div>
@@ -1044,12 +1069,17 @@ export default function EmployeePortalPage({
                   fontSize: 26,
                   fontWeight: 800,
                   color: 'var(--text)',
-                  margin: '10px 0 8px',
+                  margin: '10px 0 4px',
                   letterSpacing: '-0.01em',
                 }}
               >
                 {formatInr(deptAnalytics.employeeNetSalesInr)} / {formatInr(deptAnalytics.departmentTargetInr)}
               </div>
+              {deptAnalytics.targetPeriodMonths > 1 && (
+                <div style={{ fontSize: 12, color: '#7c3aed', fontWeight: 600, marginBottom: 8 }}>
+                  Total {deptAnalytics.targetPeriodMonths}-Month Target ({formatInr(deptAnalytics.monthlyDepartmentTargetInr)}/month)
+                </div>
+              )}
 
               {/* Progress Bar */}
               <div
@@ -1082,7 +1112,9 @@ export default function EmployeePortalPage({
                 }}
               >
                 <span>Employee contribution</span>
-                <span>Department target</span>
+                <span>
+                  Department target {deptAnalytics.targetPeriodMonths > 1 ? `(${deptAnalytics.targetPeriodMonths}m Total)` : '(Monthly)'}
+                </span>
               </div>
 
               {/* 4-Item Metric Grid */}
@@ -1096,10 +1128,17 @@ export default function EmployeePortalPage({
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Individual target</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    Individual target {deptAnalytics.targetPeriodMonths > 1 ? `(${deptAnalytics.targetPeriodMonths}m)` : ''}
+                  </div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', marginTop: 2 }}>
                     {formatInr(deptAnalytics.individualTargetInr)}
                   </div>
+                  {deptAnalytics.targetPeriodMonths > 1 && (
+                    <div style={{ fontSize: 11, color: '#6d28d9', fontWeight: 600, marginTop: 2 }}>
+                      {formatInr(deptAnalytics.individualMonthlyTargetInr)} / month
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1127,9 +1166,26 @@ export default function EmployeePortalPage({
 
             {/* Card 2: Department Performance */}
             <div className="card" style={{ padding: 22 }}>
-              <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
-                Department Performance
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                  Department Performance
+                </h3>
+                {deptAnalytics.targetPeriodLabel && (
+                  <span
+                    style={{
+                      background: '#f3e8ff',
+                      color: '#7c3aed',
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 8,
+                      border: '1px solid #ddd6fe',
+                    }}
+                  >
+                    📅 {deptAnalytics.targetPeriodLabel}
+                  </span>
+                )}
+              </div>
 
               <div
                 style={{
@@ -1138,6 +1194,7 @@ export default function EmployeePortalPage({
                   alignItems: 'flex-start',
                   flexWrap: 'wrap',
                   gap: 10,
+                  marginBottom: 16,
                 }}
               >
                 <div>

@@ -11,11 +11,39 @@ import {
   UserPlus,
   UserMinus,
   Sparkles,
+  Calendar,
+  Clock,
 } from 'lucide-react';
-import { api, formatInr } from '../api/client';
+import { api, formatInr, formatDate } from '../api/client';
 import EmployeeAvatar from './EmployeeAvatar';
 
 const COLOR_PRESETS = ['#7C3AED', '#2563EB', '#059669', '#D97706', '#DB2777', '#0891B2'];
+
+// Helper to compute start & end dates based on preset duration
+function computePresetDates(preset, baseStart = '2026-11-01') {
+  let startY = 2026;
+  let startM = 11;
+  if (baseStart && baseStart.length >= 7) {
+    const parts = baseStart.split('-').map(Number);
+    if (parts[0] && parts[1]) {
+      startY = parts[0];
+      startM = parts[1];
+    }
+  }
+  const startStr = `${startY}-${String(startM).padStart(2, '0')}-01`;
+
+  let months = 1;
+  if (preset === '3m') months = 3;
+  else if (preset === '6m') months = 6;
+  else if (preset === '12m') months = 12;
+  else months = 1;
+
+  // Last day of target end month
+  const endObj = new Date(Date.UTC(startY, startM - 1 + months, 0));
+  const endStr = endObj.toISOString().slice(0, 10);
+
+  return { months, startDate: startStr, endDate: endStr };
+}
 
 export default function DepartmentModal({
   isOpen,
@@ -34,6 +62,12 @@ export default function DepartmentModal({
   const [name, setName] = useState('');
   const [targetMonthlySales, setTargetMonthlySales] = useState('1000000');
   const [colorHex, setColorHex] = useState('#7C3AED');
+
+  // Target validity period state: '1m' | '3m' | '6m' | '12m' | 'custom'
+  const [targetPreset, setTargetPreset] = useState('1m');
+  const [targetMonths, setTargetMonths] = useState(1);
+  const [targetStartDate, setTargetStartDate] = useState('2026-11-01');
+  const [targetEndDate, setTargetEndDate] = useState('2026-11-30');
 
   // Staff management state
   const [staffList, setStaffList] = useState([]);
@@ -66,6 +100,20 @@ export default function DepartmentModal({
       const deptTarget = Number(initialDepartment.target_monthly_sales ?? 1000000);
       setTargetMonthlySales(String(deptTarget));
       setColorHex(initialDepartment.color_hex || '#7C3AED');
+
+      // Populate target validity period
+      const period = initialDepartment.target_period || {};
+      const preset = period.preset || '1m';
+      const months = Number(period.months) || (preset === '6m' ? 6 : preset === '12m' ? 12 : preset === '3m' ? 3 : 1);
+      const startDate = period.startDate || '2026-11-01';
+      let endDate = period.endDate;
+      if (!endDate) {
+        endDate = computePresetDates(preset, startDate).endDate;
+      }
+      setTargetPreset(preset);
+      setTargetMonths(months);
+      setTargetStartDate(startDate);
+      setTargetEndDate(endDate);
 
       // Filter assigned staff
       const assigned = (allEmployees || []).filter(
@@ -107,6 +155,10 @@ export default function DepartmentModal({
       setName('');
       setTargetMonthlySales('1000000');
       setColorHex('#7C3AED');
+      setTargetPreset('1m');
+      setTargetMonths(1);
+      setTargetStartDate('2026-11-01');
+      setTargetEndDate('2026-11-30');
       setStaffList([]);
       setStaffTargets({});
     }
@@ -216,6 +268,45 @@ export default function DepartmentModal({
     setReassignTargetDeptId('');
   }
 
+  function handlePresetChange(preset) {
+    setTargetPreset(preset);
+    if (preset !== 'custom') {
+      const computed = computePresetDates(preset, targetStartDate || '2026-11-01');
+      setTargetMonths(computed.months);
+      setTargetStartDate(computed.startDate);
+      setTargetEndDate(computed.endDate);
+    }
+  }
+
+  function recalcMonthsFromDates(startStr, endStr) {
+    const d1 = new Date(`${startStr}T00:00:00Z`);
+    const d2 = new Date(`${endStr}T00:00:00Z`);
+    if (!isNaN(d1.getTime()) && !isNaN(d2.getTime()) && d2 >= d1) {
+      const diffDays = Math.round((d2 - d1) / (24 * 3600 * 1000)) + 1;
+      const m = Math.max(1, Math.round(diffDays / 30.4375));
+      setTargetMonths(m);
+      if (m === 1) setTargetPreset('1m');
+      else if (m === 3) setTargetPreset('3m');
+      else if (m === 6) setTargetPreset('6m');
+      else if (m === 12) setTargetPreset('12m');
+      else setTargetPreset('custom');
+    }
+  }
+
+  function handleStartDateChange(val) {
+    setTargetStartDate(val);
+    if (val && targetEndDate) {
+      recalcMonthsFromDates(val, targetEndDate);
+    }
+  }
+
+  function handleEndDateChange(val) {
+    setTargetEndDate(val);
+    if (targetStartDate && val) {
+      recalcMonthsFromDates(targetStartDate, val);
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setErrorMsg('');
@@ -228,6 +319,12 @@ export default function DepartmentModal({
         color_hex: colorHex,
         staff_targets: staffTargets,
         reassigned_employees: reassignments,
+        target_period: {
+          preset: targetPreset,
+          months: targetMonths,
+          startDate: targetStartDate,
+          endDate: targetEndDate,
+        },
       };
 
       const saved = isExisting
@@ -435,11 +532,16 @@ export default function DepartmentModal({
                 }}
               >
                 <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>
-                  Department Target
+                  Department Target {targetMonths > 1 ? `(${targetMonths}m Total)` : '(Monthly)'}
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: '#5b21b6', marginTop: 2 }}>
-                  {formatInr(deptTargetNum)}
+                  {formatInr(deptTargetNum * targetMonths)}
                 </div>
+                {targetMonths > 1 && (
+                  <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600, marginTop: 2 }}>
+                    {formatInr(deptTargetNum)} / month
+                  </div>
+                )}
               </div>
 
               <div
@@ -451,11 +553,16 @@ export default function DepartmentModal({
                 }}
               >
                 <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>
-                  Allocated to Staff ({staffList.length})
+                  Allocated to Staff ({staffList.length}) {targetMonths > 1 ? `(${targetMonths}m Total)` : ''}
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: '#1e1b4b', marginTop: 2 }}>
-                  {formatInr(isMatched ? deptTargetNum : sumStaffTargets)}
+                  {formatInr((isMatched ? deptTargetNum : sumStaffTargets) * targetMonths)}
                 </div>
+                {targetMonths > 1 && (
+                  <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginTop: 2 }}>
+                    {formatInr(isMatched ? deptTargetNum : sumStaffTargets)} / month
+                  </div>
+                )}
               </div>
 
               <div
@@ -576,6 +683,74 @@ export default function DepartmentModal({
                 </span>
               </div>
 
+              {/* Target Period & Validity Range (View Mode) */}
+              <div
+                style={{
+                  background: '#ffffff',
+                  border: '1.5px solid #e9d5ff',
+                  borderRadius: 12,
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 8,
+                      background: '#f3e8ff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Calendar size={18} color="#7c3aed" />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#4c1d95' }}>
+                        Target Period: {targetPreset === '1m' ? '1 Month (Monthly Target)' : targetPreset === '3m' ? '3 Months (Quarterly Target)' : targetPreset === '6m' ? '6 Months (Half-Yearly Target)' : targetPreset === '12m' ? '12 Months (Annual Target)' : `Custom Range (${targetMonths} Months)`}
+                      </span>
+                      <span
+                        style={{
+                          background: '#ede9fe',
+                          color: '#6d28d9',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                        }}
+                      >
+                        {targetMonths} {targetMonths === 1 ? 'Month' : 'Months'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                      Validity Range: <strong>{formatDate(targetStartDate)}</strong> to <strong>{formatDate(targetEndDate)}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 600 }}>
+                    {targetMonths > 1 ? `Total Period Target (${targetMonths}m)` : 'Monthly Target'}
+                  </div>
+                  <div style={{ fontSize: 16.5, fontWeight: 800, color: '#5b21b6' }}>
+                    {formatInr(deptTargetNum * targetMonths)}
+                  </div>
+                  {targetMonths > 1 && (
+                    <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600 }}>
+                      ({formatInr(deptTargetNum)}/mo × {targetMonths}m)
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Assigned Staff Table in Details Mode */}
               <div>
                 <div
@@ -621,6 +796,9 @@ export default function DepartmentModal({
                           <th>Code</th>
                           <th>Role</th>
                           <th style={{ textAlign: 'right' }}>Monthly Target</th>
+                          {targetMonths > 1 && (
+                            <th style={{ textAlign: 'right' }}>Total Target ({targetMonths}m)</th>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
@@ -644,6 +822,13 @@ export default function DepartmentModal({
                                 {formatInr(staffTargets[emp.id] || 0)}
                               </strong>
                             </td>
+                            {targetMonths > 1 && (
+                              <td style={{ textAlign: 'right' }}>
+                                <strong className="tabular-nums" style={{ color: '#059669', fontWeight: 800 }}>
+                                  {formatInr((staffTargets[emp.id] || 0) * targetMonths)}
+                                </strong>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -701,6 +886,117 @@ export default function DepartmentModal({
                   onChange={(e) => setName(e.target.value)}
                   required
                 />
+              </div>
+
+              {/* Target Period & Validity Range Configuration Card */}
+              <div
+                style={{
+                  background: '#fbfbfe',
+                  border: '1.5px solid #ddd6fe',
+                  borderRadius: 14,
+                  padding: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Calendar size={16} color="#7c3aed" />
+                    <strong style={{ fontSize: 13, color: '#4c1d95' }}>Target Period &amp; Validity Range</strong>
+                  </div>
+                  <span style={{ fontSize: 11.5, color: '#6d28d9', fontWeight: 600 }}>
+                    Select duration (1m, 3m, 6m, 12m) or custom range
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                  <div className="field" style={{ margin: 0 }}>
+                    <label className="field-label" style={{ fontSize: 12, fontWeight: 700, color: '#4c1d95' }}>
+                      Target Duration Preset
+                    </label>
+                    <select
+                      className="select"
+                      value={targetPreset}
+                      onChange={(e) => handlePresetChange(e.target.value)}
+                      style={{ width: '100%', fontSize: 12.5, fontWeight: 600, border: '1.5px solid #c4b5fd' }}
+                    >
+                      <option value="1m">1 Month (Monthly Target)</option>
+                      <option value="3m">3 Months (Quarterly Target)</option>
+                      <option value="6m">6 Months (Half-Yearly Target)</option>
+                      <option value="12m">12 Months (Annual Target)</option>
+                      <option value="custom">Custom Date Range</option>
+                    </select>
+                  </div>
+
+                  <div className="field" style={{ margin: 0 }}>
+                    <label className="field-label" style={{ fontSize: 12, fontWeight: 700, color: '#4c1d95' }}>
+                      Starting From Date
+                    </label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={targetStartDate}
+                      onChange={(e) => handleStartDateChange(e.target.value)}
+                      style={{ width: '100%', fontSize: 12.5, border: '1.5px solid #c4b5fd' }}
+                      required
+                    />
+                  </div>
+
+                  <div className="field" style={{ margin: 0 }}>
+                    <label className="field-label" style={{ fontSize: 12, fontWeight: 700, color: '#4c1d95' }}>
+                      To Date
+                    </label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={targetEndDate}
+                      onChange={(e) => handleEndDateChange(e.target.value)}
+                      style={{ width: '100%', fontSize: 12.5, border: '1.5px solid #c4b5fd' }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Computed Period Summary Callout */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    background: '#ffffff',
+                    border: '1px solid #c4b5fd',
+                    borderRadius: 10,
+                    padding: '8px 12px',
+                    fontSize: 12,
+                    flexWrap: 'wrap',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Clock size={14} color="#7c3aed" />
+                    <span style={{ color: '#4b5563' }}>Duration:</span>
+                    <strong style={{ color: '#5b21b6' }}>
+                      {targetMonths} {targetMonths === 1 ? 'Month' : 'Months'}
+                    </strong>
+                    <span style={{ color: '#9ca3af' }}>•</span>
+                    <span style={{ color: '#4b5563' }}>
+                      {formatDate(targetStartDate)} to {formatDate(targetEndDate)}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span style={{ color: '#4b5563' }}>Total Period Target: </span>
+                    <strong style={{ color: '#7c3aed', fontSize: 13.5 }}>
+                      {formatInr(deptTargetNum * targetMonths)}
+                    </strong>
+                    {targetMonths > 1 && (
+                      <span style={{ color: '#6d28d9', fontSize: 11, marginLeft: 4 }}>
+                        ({formatInr(deptTargetNum)}/mo × {targetMonths}m)
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="field">
@@ -789,7 +1085,10 @@ export default function DepartmentModal({
                         <tr>
                           <th>Staff Member</th>
                           <th>Role</th>
-                          <th style={{ width: 170 }}>Monthly Target (₹)</th>
+                          <th style={{ width: 140 }}>Monthly Target (₹)</th>
+                          {targetMonths > 1 && (
+                            <th style={{ width: 135 }}>{targetMonths}m Target (₹)</th>
+                          )}
                           <th style={{ width: 80, textAlign: 'center' }}>Action</th>
                         </tr>
                       </thead>
@@ -823,7 +1122,7 @@ export default function DepartmentModal({
                                       padding: '5px 8px',
                                       fontSize: 13,
                                       fontWeight: 700,
-                                      width: 130,
+                                      width: 105,
                                     }}
                                     value={staffTargets[emp.id] ?? ''}
                                     onChange={(e) => handleStaffTargetChange(emp.id, e.target.value)}
@@ -832,6 +1131,13 @@ export default function DepartmentModal({
                                   />
                                 </div>
                               </td>
+                              {targetMonths > 1 && (
+                                <td>
+                                  <strong className="tabular-nums" style={{ fontSize: 13, color: '#059669', fontWeight: 800 }}>
+                                    {formatInr((Number(staffTargets[emp.id]) || 0) * targetMonths)}
+                                  </strong>
+                                </td>
+                              )}
                               <td style={{ textAlign: 'center' }}>
                                 <button
                                   type="button"
@@ -857,7 +1163,7 @@ export default function DepartmentModal({
                             {/* Inline Reassign Drawer when Remove is clicked */}
                             {reassigningEmpId === emp.id && (
                               <tr style={{ background: '#fffbeb' }}>
-                                <td colSpan={4} style={{ padding: '10px 14px' }}>
+                                <td colSpan={targetMonths > 1 ? 5 : 4} style={{ padding: '10px 14px' }}>
                                   <div
                                     style={{
                                       display: 'flex',

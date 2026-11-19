@@ -88,9 +88,23 @@ function parseStaffTargets(aiProviderStr) {
   }
 }
 
+function parseDeptPeriods(aiProviderStr) {
+  const str = String(aiProviderStr || '');
+  if (!str.includes('###dept_periods:')) {
+    return {};
+  }
+  try {
+    const raw = str.split('###dept_periods:')[1].split('###')[0];
+    return JSON.parse(raw) || {};
+  } catch (e) {
+    return {};
+  }
+}
+
 function packStaffTargets(aiProviderStr, newTargetsMap = {}) {
   const str = String(aiProviderStr || 'builtin');
   const existingMap = parseStaffTargets(str);
+  const deptPeriods = parseDeptPeriods(str);
   const merged = { ...existingMap };
   for (const [k, v] of Object.entries(newTargetsMap)) {
     if (v == null || v === '') {
@@ -102,8 +116,32 @@ function packStaffTargets(aiProviderStr, newTargetsMap = {}) {
       }
     }
   }
-  const baseProvider = str.split('###staff_targets:')[0].trim() || 'builtin';
-  return `${baseProvider}###staff_targets:${JSON.stringify(merged)}`;
+  const baseProvider = str.split('###')[0].trim() || 'builtin';
+  let result = baseProvider;
+  if (Object.keys(merged).length > 0) {
+    result += `###staff_targets:${JSON.stringify(merged)}`;
+  }
+  if (Object.keys(deptPeriods).length > 0) {
+    result += `###dept_periods:${JSON.stringify(deptPeriods)}`;
+  }
+  return result;
+}
+
+function packDeptPeriods(aiProviderStr, newPeriodsMap = {}) {
+  const str = String(aiProviderStr || 'builtin');
+  const staffTargets = parseStaffTargets(str);
+  const existingPeriods = parseDeptPeriods(str);
+  const merged = { ...existingPeriods, ...newPeriodsMap };
+  const baseProvider = str.split('###')[0].trim() || 'builtin';
+
+  let result = baseProvider;
+  if (Object.keys(staffTargets).length > 0) {
+    result += `###staff_targets:${JSON.stringify(staffTargets)}`;
+  }
+  if (Object.keys(merged).length > 0) {
+    result += `###dept_periods:${JSON.stringify(merged)}`;
+  }
+  return result;
 }
 
 module.exports = {
@@ -114,5 +152,7 @@ module.exports = {
   isPasswordValid,
   parseStaffTargets,
   packStaffTargets,
+  parseDeptPeriods,
+  packDeptPeriods,
 };
 

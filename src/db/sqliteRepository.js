@@ -16,6 +16,8 @@ const {
   isPasswordValid,
   parseStaffTargets,
   packStaffTargets,
+  parseDeptPeriods,
+  packDeptPeriods,
 } = require('../utils/authUtils');
 
 class SqliteRepository {
@@ -65,7 +67,18 @@ class SqliteRepository {
   }
 
   async getDepartments() {
-    return this.db.prepare('SELECT * FROM departments ORDER BY target_monthly_sales DESC').all();
+    const rows = this.db.prepare('SELECT * FROM departments ORDER BY target_monthly_sales DESC').all();
+    const settings = await this.getSettings();
+    const periods = parseDeptPeriods(settings?.ai_provider);
+    return rows.map((r) => ({
+      ...r,
+      target_period: periods[r.id] || {
+        preset: '1m',
+        months: 1,
+        startDate: '',
+        endDate: '',
+      },
+    }));
   }
 
   _formatEmployee(row) {
@@ -158,6 +171,12 @@ class SqliteRepository {
       await this.updateSettings({ ai_provider: updatedAi });
     }
 
+    if (payload.target_period && typeof payload.target_period === 'object') {
+      const currentSettings = await this.getSettings();
+      const updatedAi = packDeptPeriods(currentSettings.ai_provider, { [id]: payload.target_period });
+      await this.updateSettings({ ai_provider: updatedAi });
+    }
+
     if (Array.isArray(payload.reassigned_employees)) {
       const reassignStmt = this.db.prepare('UPDATE employees SET department_id = ? WHERE id = ?');
       for (const item of payload.reassigned_employees) {
@@ -167,7 +186,11 @@ class SqliteRepository {
       }
     }
 
-    return this.db.prepare('SELECT * FROM departments WHERE id = ?').get(id);
+    const row = this.db.prepare('SELECT * FROM departments WHERE id = ?').get(id);
+    return {
+      ...row,
+      target_period: payload.target_period || { preset: '1m', months: 1, startDate: '', endDate: '' },
+    };
   }
 
   async updateDepartment(id, payload) {
@@ -197,6 +220,12 @@ class SqliteRepository {
       await this.updateSettings({ ai_provider: updatedAi });
     }
 
+    if (payload.target_period && typeof payload.target_period === 'object') {
+      const currentSettings = await this.getSettings();
+      const updatedAi = packDeptPeriods(currentSettings.ai_provider, { [id]: payload.target_period });
+      await this.updateSettings({ ai_provider: updatedAi });
+    }
+
     if (Array.isArray(payload.reassigned_employees)) {
       const reassignStmt = this.db.prepare('UPDATE employees SET department_id = ? WHERE id = ?');
       for (const item of payload.reassigned_employees) {
@@ -206,7 +235,11 @@ class SqliteRepository {
       }
     }
 
-    return this.db.prepare('SELECT * FROM departments WHERE id = ?').get(id);
+    const row = this.db.prepare('SELECT * FROM departments WHERE id = ?').get(id);
+    return {
+      ...row,
+      target_period: payload.target_period || { preset: '1m', months: 1, startDate: '', endDate: '' },
+    };
   }
 
   async deleteDepartment(id) {

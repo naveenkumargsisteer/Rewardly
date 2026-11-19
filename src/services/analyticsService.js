@@ -421,6 +421,26 @@ async function getEmployeeDetail(employeeId, { startDate, endDate } = {}) {
   const targetEmp = allEmployees.find((e) => e.id === employeeId || e.emp_code === employeeId);
   if (!targetEmp) return null;
 
+  const empDept = departments.find(
+    (d) => d.id === targetEmp.department_id || d.code === targetEmp.department_code
+  ) || {
+    id: targetEmp.department_id,
+    name: targetEmp.department_name || 'Showroom Department',
+    code: targetEmp.department_code || '',
+    target_monthly_sales: 1000000,
+    target_period: { preset: '1m', months: 1, startDate: '2026-11-01', endDate: '2026-11-30' },
+  };
+
+  const deptTargetPeriod = empDept.target_period || {
+    preset: '1m',
+    months: 1,
+    startDate: '2026-11-01',
+    endDate: '2026-11-30',
+  };
+  const periodMonths = Math.max(1, Number(deptTargetPeriod.months) || 1);
+  const targetPeriodStart = deptTargetPeriod.startDate || '2026-11-01';
+  const targetPeriodEnd = deptTargetPeriod.endDate || '2026-11-30';
+
   // For monthly progression trend, ensure at least trailing 4-5 months if a single month or narrow range is filtered
   let trendStart = resolvedStart;
   const rawBuckets = buildMonthBuckets(resolvedStart, resolvedEnd);
@@ -430,11 +450,18 @@ async function getEmployeeDetail(employeeId, { startDate, endDate } = {}) {
     const trailingStart = d.toISOString().slice(0, 7) + '-01';
     trendStart = trailingStart < meta.dateBounds.minDate ? meta.dateBounds.minDate : trailingStart;
   }
-  const fetchStart = trendStart < resolvedStart ? trendStart : resolvedStart;
+  let fetchStart = trendStart < resolvedStart ? trendStart : resolvedStart;
+  if (targetPeriodStart && targetPeriodStart < fetchStart) {
+    fetchStart = targetPeriodStart < meta.dateBounds.minDate ? meta.dateBounds.minDate : targetPeriodStart;
+  }
+  let fetchEnd = resolvedEnd;
+  if (targetPeriodEnd && targetPeriodEnd > fetchEnd) {
+    fetchEnd = targetPeriodEnd > meta.dateBounds.maxDate ? meta.dateBounds.maxDate : targetPeriodEnd;
+  }
 
   const periodData = await repo.getPeriodData({
     startDate: fetchStart,
-    endDate: resolvedEnd,
+    endDate: fetchEnd,
     departmentCode: 'all',
   });
 
@@ -501,14 +528,6 @@ async function getEmployeeDetail(employeeId, { startDate, endDate } = {}) {
 
   // Department metrics for Department Target Contribution & Performance
   const daysSpan = getDaysInclusive(resolvedStart, resolvedEnd);
-  const empDept = departments.find(
-    (d) => d.id === targetEmp.department_id || d.code === targetEmp.department_code
-  ) || {
-    id: targetEmp.department_id,
-    name: targetEmp.department_name || 'Showroom Department',
-    code: targetEmp.department_code || '',
-    target_monthly_sales: 1000000,
-  };
 
   const deptStaffIds = new Set(
     allEmployees
@@ -516,19 +535,29 @@ async function getEmployeeDetail(employeeId, { startDate, endDate } = {}) {
       .map((e) => e.id)
   );
 
-  // Targets are monthly sales targets set by showroom management in the department modal
+  // Targets are configured sales targets set by showroom management in the department modal
   const monthlyDeptTarget = Number(empDept.target_monthly_sales || 1000000);
   const empIndividualMonthlyTarget = (Number(targetEmp.target_monthly_sales) > 0)
     ? Number(targetEmp.target_monthly_sales)
     : Math.round(monthlyDeptTarget / Math.max(1, deptStaffIds.size));
 
+  const isMultiMonth = periodMonths > 1;
+  const effectiveDeptTarget = monthlyDeptTarget * periodMonths;
+  const effectiveEmpTarget = empIndividualMonthlyTarget * periodMonths;
+
   // Determine the target evaluation slice:
-  // For monthly targets, if a multi-month period ("full time", etc., > 35 days) is filtered,
-  // the target tracking evaluates the active month of resolvedEnd (e.g. current month).
+  // 1. If multi-month target (e.g. 3m, 6m, 12m), evaluate all sales within the target window [targetPeriodStart, targetPeriodEnd].
+  // 2. If 1-month target viewed under a wide multi-month/full-time filter (>35 days), evaluate the active month of resolvedEnd.
+  // 3. Otherwise, evaluate within the active filter [resolvedStart, resolvedEnd].
   let targetPeriodSales = activePeriodSales;
   let targetEmpSales = empSales;
 
-  if (daysSpan > 35) {
+  if (isMultiMonth) {
+    targetPeriodSales = periodData.sales.filter(
+      (s) => s.sale_date >= targetPeriodStart && s.sale_date <= targetPeriodEnd
+    );
+    targetEmpSales = targetPeriodSales.filter((s) => s.employee_id === targetEmp.id);
+  } else if (daysSpan > 35) {
     const activeMonthPrefix = resolvedEnd.slice(0, 7); // e.g. "2026-11"
     targetPeriodSales = activePeriodSales.filter((s) => String(s.sale_date).startsWith(activeMonthPrefix));
     targetEmpSales = empSales.filter((s) => String(s.sale_date).startsWith(activeMonthPrefix));
@@ -553,42 +582,58 @@ async function getEmployeeDetail(employeeId, { startDate, endDate } = {}) {
   empNetSalesInr = Math.round(empNetSalesInr);
   const avgBillValueInr = empBillsCount > 0 ? Math.round(empNetSalesInr / empBillsCount) : 0;
 
-  const empContributionToDeptTargetPct = monthlyDeptTarget > 0
-    ? round1((empNetSalesInr / monthlyDeptTarget) * 100)
+  const empContributionToDeptTargetPct = effectiveDeptTarget > 0
+    ? round1((empNetSalesInr / effectiveDeptTarget) * 100)
     : 0;
 
   const empContributionToActualSalesPct = deptActualSalesInr > 0
     ? round1((empNetSalesInr / deptActualSalesInr) * 100)
     : 0;
 
-  const deptTargetAchievedPct = monthlyDeptTarget > 0
-    ? round1((deptActualSalesInr / monthlyDeptTarget) * 100)
+  const deptTargetAchievedPct = effectiveDeptTarget > 0
+    ? round1((deptActualSalesInr / effectiveDeptTarget) * 100)
     : 100;
 
-  const empIndividualTargetPct = empIndividualMonthlyTarget > 0
-    ? round1((empNetSalesInr / empIndividualMonthlyTarget) * 100)
+  const empIndividualTargetPct = effectiveEmpTarget > 0
+    ? round1((empNetSalesInr / effectiveEmpTarget) * 100)
     : 0;
 
-  const targetRemainingInr = Math.max(0, empIndividualMonthlyTarget - empNetSalesInr);
+  const targetRemainingInr = Math.max(0, effectiveEmpTarget - empNetSalesInr);
   const firstName = (targetEmp.full_name || '').split(/\s+/)[0] || 'Employee';
+
+  const targetPeriodLabel =
+    periodMonths === 1
+      ? 'Monthly Target'
+      : periodMonths === 3
+        ? '3 Months (Quarterly)'
+        : periodMonths === 6
+          ? '6 Months (Half-Yearly)'
+          : periodMonths === 12
+            ? '12 Months (Annual)'
+            : `${periodMonths} Months Target`;
 
   const departmentAnalytics = {
     departmentName: empDept.name || targetEmp.department_name,
     departmentCode: empDept.code || targetEmp.department_code,
-    departmentTargetInr: monthlyDeptTarget,
+    departmentTargetInr: effectiveDeptTarget,
     monthlyDepartmentTargetInr: monthlyDeptTarget,
     deptActualSalesInr,
     deptTargetAchievedPct,
     employeeNetSalesInr: empNetSalesInr,
     contributionToDeptTargetPct: empContributionToDeptTargetPct,
     contributionToActualSalesPct: empContributionToActualSalesPct,
-    individualTargetInr: empIndividualMonthlyTarget,
+    individualTargetInr: effectiveEmpTarget,
     individualMonthlyTargetInr: empIndividualMonthlyTarget,
     individualTargetPct: empIndividualTargetPct,
     targetRemainingInr,
     transactionsCount: empBillsCount,
     avgBillValueInr,
     employeeFirstName: firstName,
+    targetPeriodPreset: deptTargetPeriod.preset || (periodMonths === 1 ? '1m' : `${periodMonths}m`),
+    targetPeriodMonths: periodMonths,
+    targetPeriodLabel,
+    targetPeriodStartDate: targetPeriodStart,
+    targetPeriodEndDate: targetPeriodEnd,
   };
 
   return {
