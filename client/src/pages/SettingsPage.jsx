@@ -534,14 +534,13 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
                 <th>Code</th>
                 <th>Department</th>
                 <th>Role &amp; Shift</th>
-                <th>Salary &amp; Joined</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
               {filteredEmployees.length === 0 ? (
                 <tr style={{ cursor: 'default' }}>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: 28, color: 'var(--text-muted)' }}>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: 28, color: 'var(--text-muted)' }}>
                     No employees match the current filters.
                   </td>
                 </tr>
@@ -581,12 +580,6 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
                   <td>
                     <div style={{ fontWeight: 600 }}>{emp.role}</div>
                     <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{emp.shift}</div>
-                  </td>
-                  <td>
-                    <div className="tabular-nums" style={{ fontWeight: 600 }}>{formatInr(emp.base_salary_inr)}</div>
-                    <div className="tabular-nums" style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                      {formatDate(emp.join_date)}
-                    </div>
                   </td>
                   <td>
                     <span className={`status-badge ${emp.status === 'active' ? 'status-Approved' : 'status-Dismissed'}`}>

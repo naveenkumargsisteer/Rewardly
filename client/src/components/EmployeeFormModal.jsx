@@ -377,11 +377,6 @@ export default function EmployeeFormModal({
               </div>
 
               <div className="emp-detail-item">
-                <span className="emp-detail-label">Monthly Base Salary</span>
-                <strong className="emp-detail-value tabular-nums">{formatInr(form.base_salary_inr)}</strong>
-              </div>
-
-              <div className="emp-detail-item">
                 <span className="emp-detail-label">Account Status</span>
                 <strong className="emp-detail-value" style={{ textTransform: 'capitalize' }}>{form.status}</strong>
               </div>
@@ -526,19 +521,6 @@ export default function EmployeeFormModal({
                   className="input"
                   value={form.join_date}
                   onChange={(e) => setForm({ ...form, join_date: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="field">
-                <label className="field-label">Monthly Base Salary (₹) *</label>
-                <input
-                  type="number"
-                  className="input"
-                  min={0}
-                  step="500"
-                  value={form.base_salary_inr}
-                  onChange={(e) => setForm({ ...form, base_salary_inr: e.target.value })}
                   required
                 />
               </div>

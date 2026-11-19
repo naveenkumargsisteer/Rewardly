@@ -89,7 +89,7 @@ export default function EmployeePortalPage({
           setDateBounds(meta.dateBounds);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Compute preset dates for each filter category
@@ -573,26 +573,9 @@ export default function EmployeePortalPage({
         <div className="emp-portal-composite-banner-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <span style={{ fontSize: 11.5, fontWeight: 700, color: '#e9d5ff', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-              Composite Score
+              Loyalty  Score
             </span>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                fontSize: 10,
-                fontWeight: 700,
-                color: '#34d399',
-                background: 'rgba(16, 185, 129, 0.2)',
-                border: '1px solid rgba(52, 211, 153, 0.4)',
-                padding: '2px 8px',
-                borderRadius: 12,
-              }}
-              title="Real-time composite score based on showroom target weightage"
-            >
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', display: 'inline-block', boxShadow: '0 0 6px #34d399' }}></span>
-              Real-Time
-            </span>
+
           </div>
 
           <div

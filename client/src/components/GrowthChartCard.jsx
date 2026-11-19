@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Line } from 'react-chartjs-2';
 import { TrendingUp, ArrowUpRight, Zap, Target } from 'lucide-react';
 import './chartSetup';
 import { formatCompactInr } from '../api/client';
 
 export default function GrowthChartCard({ monthlyTrend, kpis }) {
-  const [mode, setMode] = useState('growth'); // 'growth' | 'sales'
-
   const list = (monthlyTrend || []).length > 0 ? monthlyTrend : [
     { shortLabel: 'Jul', label: 'Jul 2026', netSalesInr: 4460000, performanceScore: 85.5 },
     { shortLabel: 'Aug', label: 'Aug 2026', netSalesInr: 7731800, performanceScore: 88.6 },
@@ -39,30 +37,23 @@ export default function GrowthChartCard({ monthlyTrend, kpis }) {
     labels,
     datasets: [
       {
-        label: mode === 'growth' ? 'MoM Growth Rate (%)' : 'Monthly Sales Revenue (₹ Lakhs)',
-        data: mode === 'growth'
-          ? growthPoints
-          : list.map((m) => Math.round(m.netSalesInr / 100000)),
-        borderColor: mode === 'growth' ? '#10b981' : '#6d28d9',
+        label: 'MoM Growth Rate (%)',
+        data: growthPoints,
+        borderColor: '#10b981',
         backgroundColor: (ctx) => {
           const chart = ctx.chart;
           const { ctx: c, chartArea } = chart;
-          if (!chartArea) return mode === 'growth' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(109, 40, 217, 0.12)';
+          if (!chartArea) return 'rgba(16, 185, 129, 0.12)';
           const grad = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          if (mode === 'growth') {
-            grad.addColorStop(0, 'rgba(16, 185, 129, 0.28)');
-            grad.addColorStop(1, 'rgba(16, 185, 129, 0.01)');
-          } else {
-            grad.addColorStop(0, 'rgba(109, 40, 217, 0.28)');
-            grad.addColorStop(1, 'rgba(109, 40, 217, 0.01)');
-          }
+          grad.addColorStop(0, 'rgba(16, 185, 129, 0.28)');
+          grad.addColorStop(1, 'rgba(16, 185, 129, 0.01)');
           return grad;
         },
         fill: true,
         tension: 0.36,
         borderWidth: 2.5,
         pointBackgroundColor: '#ffffff',
-        pointBorderColor: mode === 'growth' ? '#10b981' : '#6d28d9',
+        pointBorderColor: '#10b981',
         pointBorderWidth: 2.5,
         pointRadius: 5,
         pointHoverRadius: 7,
@@ -81,11 +72,8 @@ export default function GrowthChartCard({ monthlyTrend, kpis }) {
           label: (item) => {
             const idx = item.dataIndex;
             const m = list[idx];
-            if (mode === 'growth') {
-              const val = growthPoints[idx];
-              return ` MoM Growth: ${val >= 0 ? '+' : ''}${val}% | Sales: ${formatCompactInr(m.netSalesInr)}`;
-            }
-            return ` Sales: ${formatCompactInr(m.netSalesInr)} | Score: ${m.performanceScore}%`;
+            const val = growthPoints[idx];
+            return ` MoM Growth: ${val >= 0 ? '+' : ''}${val}% | Sales: ${formatCompactInr(m.netSalesInr)}`;
           },
         },
       },
@@ -96,7 +84,7 @@ export default function GrowthChartCard({ monthlyTrend, kpis }) {
         grid: { color: '#f1f3f8' },
         border: { display: false },
         ticks: {
-          callback: (val) => (mode === 'growth' ? `${val > 0 ? '+' : ''}${val}%` : `₹${val}L`),
+          callback: (val) => `${val > 0 ? '+' : ''}${val}%`,
         },
       },
     },
@@ -106,26 +94,8 @@ export default function GrowthChartCard({ monthlyTrend, kpis }) {
     <div className="card">
       <div className="card-header">
         <div className="card-title-row">
-          <TrendingUp size={17} color={mode === 'growth' ? '#059669' : '#6d28d9'} />
-          <span>{mode === 'growth' ? 'Showroom Growth Analytics' : 'Monthly Sales Revenue Trend'}</span>
-        </div>
-        <div className="nav-pills" style={{ padding: 3 }}>
-          <button
-            type="button"
-            className={`nav-pill ${mode === 'growth' ? 'active' : ''}`}
-            style={{ padding: '4px 10px', fontSize: 11 }}
-            onClick={() => setMode('growth')}
-          >
-            Growth %
-          </button>
-          <button
-            type="button"
-            className={`nav-pill ${mode === 'sales' ? 'active' : ''}`}
-            style={{ padding: '4px 10px', fontSize: 11 }}
-            onClick={() => setMode('sales')}
-          >
-            Sales ₹
-          </button>
+          <TrendingUp size={17} color="#059669" />
+          <span>Showroom Growth Analytics</span>
         </div>
       </div>
 
