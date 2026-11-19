@@ -499,8 +499,83 @@ async function getEmployeeDetail(employeeId, { startDate, endDate } = {}) {
     };
   });
 
+  // Department metrics for Department Target Contribution & Performance
+  const daysSpan = getDaysInclusive(resolvedStart, resolvedEnd);
+  const empDept = departments.find(
+    (d) => d.id === targetEmp.department_id || d.code === targetEmp.department_code
+  ) || {
+    id: targetEmp.department_id,
+    name: targetEmp.department_name || 'Showroom Department',
+    code: targetEmp.department_code || '',
+    target_monthly_sales: 1000000,
+  };
+
+  const monthlyDeptTarget = Number(empDept.target_monthly_sales || 1000000);
+  const proRatedDeptTarget = Math.round(monthlyDeptTarget * (daysSpan / 30));
+
+  const deptStaffIds = new Set(
+    allEmployees
+      .filter((e) => e.department_id === empDept.id || e.department_code === empDept.code)
+      .map((e) => e.id)
+  );
+
+  const deptSales = activePeriodSales.filter(
+    (s) => deptStaffIds.has(s.employee_id) || s.department_id === empDept.id || s.department_code === empDept.code
+  );
+
+  let deptActualSalesInr = 0;
+  for (const s of deptSales) {
+    deptActualSalesInr += Number(s.net_amount_inr || 0);
+  }
+  deptActualSalesInr = Math.round(deptActualSalesInr);
+
+  const empNetSalesInr = employeeSummary?.metrics?.netSalesInr || 0;
+  const empIndividualMonthlyTarget = (Number(targetEmp.target_monthly_sales) > 0)
+    ? Number(targetEmp.target_monthly_sales)
+    : Math.round(monthlyDeptTarget / Math.max(1, deptStaffIds.size));
+  const empIndividualProRatedTarget = Math.round(empIndividualMonthlyTarget * (daysSpan / 30));
+
+  const empContributionToDeptTargetPct = proRatedDeptTarget > 0
+    ? round1((empNetSalesInr / proRatedDeptTarget) * 100)
+    : 0;
+
+  const empContributionToActualSalesPct = deptActualSalesInr > 0
+    ? round1((empNetSalesInr / deptActualSalesInr) * 100)
+    : 0;
+
+  const deptTargetAchievedPct = proRatedDeptTarget > 0
+    ? round1((deptActualSalesInr / proRatedDeptTarget) * 100)
+    : 100;
+
+  const empIndividualTargetPct = empIndividualProRatedTarget > 0
+    ? round1((empNetSalesInr / empIndividualProRatedTarget) * 100)
+    : 0;
+
+  const targetRemainingInr = Math.max(0, empIndividualProRatedTarget - empNetSalesInr);
+  const firstName = (targetEmp.full_name || '').split(/\s+/)[0] || 'Employee';
+
+  const departmentAnalytics = {
+    departmentName: empDept.name || targetEmp.department_name,
+    departmentCode: empDept.code || targetEmp.department_code,
+    departmentTargetInr: proRatedDeptTarget,
+    monthlyDepartmentTargetInr: monthlyDeptTarget,
+    deptActualSalesInr,
+    deptTargetAchievedPct,
+    employeeNetSalesInr: empNetSalesInr,
+    contributionToDeptTargetPct: empContributionToDeptTargetPct,
+    contributionToActualSalesPct: empContributionToActualSalesPct,
+    individualTargetInr: empIndividualProRatedTarget,
+    individualMonthlyTargetInr: empIndividualMonthlyTarget,
+    individualTargetPct: empIndividualTargetPct,
+    targetRemainingInr,
+    transactionsCount: employeeSummary?.metrics?.billsCount || 0,
+    avgBillValueInr: employeeSummary?.metrics?.avgBillValueInr || 0,
+    employeeFirstName: firstName,
+  };
+
   return {
     employee: employeeSummary,
+    departmentAnalytics,
     activeRange: { startDate: resolvedStart, endDate: resolvedEnd },
     monthlyProgression,
     recentSales: empSales.slice(-20).reverse(),

@@ -359,6 +359,24 @@ export default function EmployeePortalPage({
   const recognitions = detail?.recentRecognitions || [];
   const feedbackList = detail?.recentFeedback || [];
   const monthlyProgression = detail?.monthlyProgression || [];
+  const deptAnalytics = detail?.departmentAnalytics || {
+    departmentName: employee?.department_name || 'Silk & Sarees',
+    departmentCode: employee?.department_code || 'SILK',
+    departmentTargetInr: 200000,
+    monthlyDepartmentTargetInr: 200000,
+    deptActualSalesInr: metrics.netSalesInr || 0,
+    deptTargetAchievedPct: 100,
+    employeeNetSalesInr: metrics.netSalesInr || 0,
+    contributionToDeptTargetPct: 0,
+    contributionToActualSalesPct: 0,
+    individualTargetInr: employee?.target_monthly_sales || metrics.monthlyTargetInr || 50000,
+    individualMonthlyTargetInr: employee?.target_monthly_sales || metrics.monthlyTargetInr || 50000,
+    individualTargetPct: metrics.targetAchievementPct || 0,
+    targetRemainingInr: Math.max(0, (employee?.target_monthly_sales || 50000) - (metrics.netSalesInr || 0)),
+    transactionsCount: metrics.billsCount || 0,
+    avgBillValueInr: metrics.avgBillValueInr || 0,
+    employeeFirstName: (employee?.full_name || '').split(' ')[0] || 'Staff',
+  };
 
   // Month-over-Month Improvement & Line Chart Data
   const [trendMetric, setTrendMetric] = useState('score'); // 'score' | 'sales'
@@ -933,6 +951,242 @@ export default function EmployeePortalPage({
             </>
           )}
         </div>
+
+        {/* Department Target Contribution & Performance Cards */}
+        {loadingDetail ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Department Target Contribution Skeleton */}
+            <div className="card" style={{ padding: 22 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div>
+                  <SkeletonBox width={220} height={18} />
+                  <SkeletonBox width={120} height={14} style={{ marginTop: 6 }} />
+                </div>
+                <SkeletonBox width={140} height={24} borderRadius={12} />
+              </div>
+              <SkeletonBox width={200} height={28} style={{ margin: '14px 0 10px' }} />
+              <SkeletonBox width="100%" height={8} borderRadius={999} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, marginBottom: 16 }}>
+                <SkeletonBox width={130} height={12} />
+                <SkeletonBox width={110} height={12} />
+              </div>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 14 }}>
+                {[1, 2, 3, 4].map((k) => (
+                  <div key={k}>
+                    <SkeletonBox width={100} height={12} />
+                    <SkeletonBox width={80} height={20} style={{ marginTop: 4 }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Department Performance Skeleton */}
+            <div className="card" style={{ padding: 22 }}>
+              <SkeletonBox width={180} height={18} style={{ marginBottom: 12 }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <SkeletonBox width={140} height={14} />
+                  <SkeletonBox width={120} height={22} borderRadius={12} style={{ marginTop: 8 }} />
+                </div>
+                <SkeletonBox width={160} height={24} />
+              </div>
+              <SkeletonBox width={260} height={14} style={{ marginTop: 14 }} />
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Card 1: Department Target Contribution */}
+            <div className="card" style={{ padding: 22 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  flexWrap: 'wrap',
+                  gap: 10,
+                  marginBottom: 10,
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                    Department Target Contribution
+                  </h3>
+                  <div style={{ fontSize: 13.5, color: 'var(--text-muted)', marginTop: 3 }}>
+                    {deptAnalytics.departmentName}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                  {deptAnalytics.individualTargetPct != null && (
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#16a34a' }}>
+                      {deptAnalytics.individualTargetPct}% of individual target
+                    </span>
+                  )}
+                  <span
+                    style={{
+                      background: '#dcfce7',
+                      color: '#15803d',
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      padding: '3px 10px',
+                      borderRadius: 12,
+                      display: 'inline-block',
+                    }}
+                  >
+                    {deptAnalytics.contributionToDeptTargetPct}% of department target
+                  </span>
+                </div>
+              </div>
+
+              {/* Amount Progress */}
+              <div
+                style={{
+                  fontSize: 26,
+                  fontWeight: 800,
+                  color: 'var(--text)',
+                  margin: '10px 0 8px',
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                {formatInr(deptAnalytics.employeeNetSalesInr)} / {formatInr(deptAnalytics.departmentTargetInr)}
+              </div>
+
+              {/* Progress Bar */}
+              <div
+                style={{
+                  height: 8,
+                  borderRadius: 999,
+                  background: '#f1f5f9',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${Math.min(100, Math.max(0, deptAnalytics.contributionToDeptTargetPct))}%`,
+                    background: '#10b981',
+                    borderRadius: 999,
+                    transition: 'width 0.4s ease',
+                  }}
+                />
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: 12,
+                  color: 'var(--text-muted)',
+                  marginTop: 6,
+                  marginBottom: 16,
+                }}
+              >
+                <span>Employee contribution</span>
+                <span>Department target</span>
+              </div>
+
+              {/* 4-Item Metric Grid */}
+              <div
+                style={{
+                  borderTop: '1px solid var(--border)',
+                  paddingTop: 16,
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                  gap: 16,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Individual target</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', marginTop: 2 }}>
+                    {formatInr(deptAnalytics.individualTargetInr)}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Target remaining</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', marginTop: 2 }}>
+                    {formatInr(deptAnalytics.targetRemainingInr)}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Transactions</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', marginTop: 2 }}>
+                    {deptAnalytics.transactionsCount}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Average bill value</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', marginTop: 2 }}>
+                    {formatInr(deptAnalytics.avgBillValueInr)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: Department Performance */}
+            <div className="card" style={{ padding: 22 }}>
+              <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                Department Performance
+              </h3>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  flexWrap: 'wrap',
+                  gap: 10,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 13.5, color: 'var(--text-muted)' }}>
+                    Department achieved
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <span
+                      style={{
+                        background: '#dcfce7',
+                        color: '#15803d',
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        padding: '3px 10px',
+                        borderRadius: 12,
+                        display: 'inline-block',
+                      }}
+                    >
+                      {deptAnalytics.deptTargetAchievedPct}% target achieved
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 800,
+                    color: 'var(--text)',
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  {formatInr(deptAnalytics.deptActualSalesInr)} / {formatInr(deptAnalytics.departmentTargetInr)}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  fontSize: 13,
+                  color: 'var(--text-muted)',
+                  marginTop: 14,
+                  paddingTop: 10,
+                  borderTop: '1px solid var(--border)',
+                }}
+              >
+                {deptAnalytics.employeeFirstName}&apos;s contribution to actual department sales: {deptAnalytics.contributionToActualSalesPct}%
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Filtered Activity Row: Feedback & Recognitions */}
         <div className="emp-portal-grid">
