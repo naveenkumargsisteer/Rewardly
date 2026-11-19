@@ -99,6 +99,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  attachBill: (payload) =>
+    request('/api/employees/attach-bill', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getAttachedBills: () => request('/api/bills/attached'),
 };
 
 export function getRoleCategory(role, empCode = '') {

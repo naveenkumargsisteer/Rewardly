@@ -13,6 +13,7 @@ import {
   Layers,
   Mail,
   Phone,
+  Receipt,
   RotateCcw,
   Sparkles,
   Star,
@@ -27,6 +28,7 @@ import {
 import { api, compressImageToMinimalResolution, formatDate, formatInr } from '../api/client';
 import EmployeeAvatar from '../components/EmployeeAvatar';
 import RewardlyLoader from '../components/RewardlyLoader';
+import AttachBillModal from '../components/AttachBillModal';
 
 function SkeletonBox({ width = '100%', height = 16, style = {}, borderRadius = 8 }) {
   return (
@@ -59,6 +61,7 @@ export default function EmployeePortalPage({
 
   // Change password modal/inline state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showAttachBillModal, setShowAttachBillModal] = useState(false);
   const [currentPwd, setCurrentPwd] = useState('');
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
@@ -252,8 +255,13 @@ export default function EmployeePortalPage({
       }
     }, 5000);
 
+    function handleOpenAttachBill() {
+      setShowAttachBillModal(true);
+    }
+
     window.addEventListener('rewardly:sale_created', handleSaleCreated);
     window.addEventListener('rewardly:feedback_created', handleFeedbackCreated);
+    window.addEventListener('rewardly:open_attach_bill', handleOpenAttachBill);
     window.addEventListener('storage', handleStorage);
     document.addEventListener('visibilitychange', handleVisibility);
 
@@ -261,6 +269,7 @@ export default function EmployeePortalPage({
       clearInterval(timer);
       window.removeEventListener('rewardly:sale_created', handleSaleCreated);
       window.removeEventListener('rewardly:feedback_created', handleFeedbackCreated);
+      window.removeEventListener('rewardly:open_attach_bill', handleOpenAttachBill);
       window.removeEventListener('storage', handleStorage);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
@@ -568,6 +577,33 @@ export default function EmployeePortalPage({
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 <Clock size={13} /> {employee?.shift || 'Morning Shift'}
               </span>
+            </div>
+
+            {/* Attach & Scan Bill Action Button */}
+            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setShowAttachBillModal(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  padding: '7px 15px',
+                  borderRadius: 12,
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: 12.5,
+                  border: 'none',
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Attach & Scan showroom bill to credit sales & generate Customer Feedback QR"
+              >
+                <Receipt size={15} />
+                <span>Attach & Scan Bill</span>
+              </button>
             </div>
 
             {uploadFeedback && (
@@ -1810,6 +1846,14 @@ export default function EmployeePortalPage({
           </div>
         </div>
       )}
+      {/* Attach & Scan Bill Modal */}
+      <AttachBillModal
+        isOpen={showAttachBillModal}
+        onClose={() => setShowAttachBillModal(false)}
+        employee={employee}
+        onSuccess={() => fetchMetrics(true)}
+        showToast={showToast}
+      />
     </div>
   );
 }

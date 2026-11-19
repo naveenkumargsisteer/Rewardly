@@ -236,3 +236,4 @@ export default function DashboardSkeleton({ isCustom = false }) {
     </div>
   );
 }
+

@@ -46,14 +46,14 @@ export default function DashboardPage({
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       }
-    } catch {}
+    } catch { }
     return DEFAULT_CUSTOM_WIDGETS;
   });
 
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(customWidgets));
-    } catch {}
+    } catch { }
   }, [customWidgets]);
 
   const minDate = dateBounds?.minDate || '2026-07-12';

@@ -17,6 +17,10 @@ const {
   packStaffTargets,
   parseDeptPeriods,
   packDeptPeriods,
+  parseBillingConfig,
+  packBillingConfig,
+  parseAttachedBills,
+  packAttachedBills,
 } = require('../utils/authUtils');
 
 const DEFAULT_SETTINGS = {
@@ -132,8 +136,13 @@ class SupabaseRepository {
         this.countTable('reward_recommendations'),
       ]);
 
+    const settings = await this.getSettings();
+
     return {
-      shop,
+      shop: {
+        ...shop,
+        use_internal_billing: settings.use_internal_billing !== false,
+      },
       dateBounds: {
         minDate: minCandidates[0] || '2026-07-12',
         maxDate: maxCandidates[maxCandidates.length - 1] || '2026-11-11',
@@ -472,15 +481,21 @@ class SupabaseRepository {
     const { data, error } = await this.supabase.from('scoring_settings').select('*').limit(1);
     if (error) throw new Error(`Supabase settings error: ${error.message}`);
     const row = data?.[0];
-    if (!row) return { ...DEFAULT_SETTINGS };
+    if (!row) return { ...DEFAULT_SETTINGS, use_internal_billing: true };
+    const billingConfig = parseBillingConfig(row?.ai_provider);
     return {
       ...row,
       require_export_token: Boolean(row.require_export_token),
+      use_internal_billing: billingConfig.use_internal_billing,
     };
   }
 
   async updateSettings(patch) {
     const current = await this.getSettings();
+    let aiProvider = patch.ai_provider ?? current.ai_provider;
+    if (patch.use_internal_billing !== undefined) {
+      aiProvider = packBillingConfig(aiProvider, { use_internal_billing: Boolean(patch.use_internal_billing) });
+    }
     const next = {
       sales_weight: patch.sales_weight ?? current.sales_weight,
       attendance_weight: patch.attendance_weight ?? current.attendance_weight,
@@ -492,7 +507,7 @@ class SupabaseRepository {
       require_export_token: patch.require_export_token !== undefined
         ? Boolean(patch.require_export_token)
         : Boolean(current.require_export_token),
-      ai_provider: patch.ai_provider ?? current.ai_provider,
+      ai_provider: aiProvider,
       updated_at: new Date().toISOString(),
     };
 
@@ -503,14 +518,23 @@ class SupabaseRepository {
       .select()
       .single();
     if (error) throw new Error(`Supabase settings update error: ${error.message}`);
+    const billingConfig = parseBillingConfig(data?.ai_provider);
     return {
       ...data,
       require_export_token: Boolean(data.require_export_token),
+      use_internal_billing: billingConfig.use_internal_billing,
     };
   }
 
   async updateShop(patch) {
     const { shop } = await this.getShopAndMeta();
+    if (patch.use_internal_billing !== undefined) {
+      const currentSettings = await this.getSettings();
+      const updatedAi = packBillingConfig(currentSettings.ai_provider, {
+        use_internal_billing: Boolean(patch.use_internal_billing),
+      });
+      await this.updateSettings({ ai_provider: updatedAi });
+    }
     const { data, error } = await this.supabase
       .from('shops')
       .update({
@@ -956,6 +980,118 @@ class SupabaseRepository {
     }
 
     return { inserted: validRows.length, skipped };
+  }
+
+  async getAttachedBills() {
+    const settings = await this.getSettings();
+    return parseAttachedBills(settings.ai_provider);
+  }
+
+  async attachBill(payload = {}) {
+    const rawBillId = String(payload.bill_id || payload.invoice_no || '').trim();
+    if (!rawBillId) {
+      throw httpError(400, 'Bill ID / Receipt # is required to attach a bill.');
+    }
+    const normalizedBillId = rawBillId.toUpperCase();
+
+    const amount = Math.round(Number(payload.amount ?? payload.net_amount ?? payload.gross_amount ?? 0));
+    if (isNaN(amount) || amount <= 0) {
+      throw httpError(400, 'A valid bill amount (₹) greater than 0 is required.');
+    }
+
+    const { shop } = await this.getShopAndMeta();
+    const settings = await this.getSettings();
+    const attachedBills = parseAttachedBills(settings.ai_provider);
+
+    // Duplicate check: Bill can only be attached ONCE across the entire showroom
+    if (attachedBills[normalizedBillId]) {
+      const existing = attachedBills[normalizedBillId];
+      throw httpError(
+        409,
+        `Bill "${normalizedBillId}" has already been attached and claimed by ${existing.employee_name || 'another staff member'} (${existing.emp_code || 'RW'}) on ${existing.date || 'a previous date'}. Duplicate bills are not permitted.`
+      );
+    }
+
+    // Lookup employee
+    const empRef = String(payload.employee_id || payload.emp_code || '').trim();
+    if (!empRef) {
+      throw httpError(400, 'Employee attribution is required to attach bill.');
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(empRef);
+    let query = this.supabase
+      .from('employees')
+      .select('*, departments (id, code, name, color_hex, target_monthly_sales)');
+
+    if (isUuid) {
+      query = query.eq('id', empRef);
+    } else {
+      query = query.ilike('emp_code', empRef);
+    }
+
+    const { data: empData, error: empErr } = await query.limit(1);
+
+    if (empErr || !empData || empData.length === 0) {
+      throw httpError(404, `Staff member "${empRef}" not found.`);
+    }
+
+    const rawEmp = empData[0];
+    const dept = rawEmp.departments || {};
+    const empRow = {
+      ...rawEmp,
+      department_code: dept.code,
+      department_name: dept.name,
+      department_color: dept.color_hex,
+      target_monthly_sales: dept.target_monthly_sales,
+    };
+
+    const saleDate = payload.date || payload.sale_date || new Date().toISOString().slice(0, 10);
+    const category = payload.category || empRow.department_name || 'Showroom Sales';
+    const saleId = crypto.randomUUID();
+
+    // 1. Insert into sales_records to immediately credit staff's sales and department target contribution
+    const { error: insErr } = await this.supabase.from('sales_records').insert({
+      id: saleId,
+      shop_id: shop.id,
+      employee_id: empRow.id,
+      sale_date: saleDate,
+      bills_count: 1,
+      items_sold: 1,
+      gross_amount_inr: amount,
+      returns_inr: 0,
+      net_amount_inr: amount,
+      upsell_count: 0,
+      category,
+    });
+    if (insErr) {
+      throw new Error(`Failed to credit sale record: ${insErr.message}`);
+    }
+
+    // 2. Persist in attached_bills registry in ai_provider
+    const billEntry = {
+      bill_id: normalizedBillId,
+      original_bill_id: rawBillId,
+      employee_id: empRow.id,
+      emp_code: empRow.emp_code,
+      employee_name: empRow.full_name,
+      amount,
+      date: saleDate,
+      category,
+      created_at: new Date().toISOString(),
+      sale_id: saleId,
+    };
+
+    const updatedAi = packAttachedBills(settings.ai_provider, { [normalizedBillId]: billEntry });
+    await this.updateSettings({ ai_provider: updatedAi });
+
+    return {
+      success: true,
+      message: `Bill #${normalizedBillId} (₹${amount.toLocaleString('en-IN')}) attached successfully! Sales credited to ${empRow.full_name} (${empRow.emp_code}).`,
+      bill: billEntry,
+      sale_id: saleId,
+      employee: this._formatEmployeeRow(empRow),
+      feedback_url: `/feedback/${encodeURIComponent(empRow.emp_code)}?bill=${encodeURIComponent(normalizedBillId)}&amount=${amount}`,
+    };
   }
 
   async resetAndReseed() {

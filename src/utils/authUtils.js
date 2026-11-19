@@ -101,10 +101,63 @@ function parseDeptPeriods(aiProviderStr) {
   }
 }
 
+function parseBillingConfig(aiProviderStr) {
+  const str = String(aiProviderStr || '');
+  if (!str.includes('###billing_config:')) {
+    return { use_internal_billing: true };
+  }
+  try {
+    const raw = str.split('###billing_config:')[1].split('###')[0];
+    const parsed = JSON.parse(raw);
+    return {
+      use_internal_billing: parsed?.use_internal_billing !== false,
+      ...parsed,
+    };
+  } catch (e) {
+    return { use_internal_billing: true };
+  }
+}
+
+function parseAttachedBills(aiProviderStr) {
+  const str = String(aiProviderStr || '');
+  if (!str.includes('###attached_bills:')) {
+    return {};
+  }
+  try {
+    const raw = str.split('###attached_bills:')[1].split('###')[0];
+    return JSON.parse(raw) || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function packAllMeta(aiProviderStr, { staffTargets, deptPeriods, billingConfig, attachedBills } = {}) {
+  const str = String(aiProviderStr || 'builtin');
+  const existingStaff = staffTargets !== undefined ? staffTargets : parseStaffTargets(str);
+  const existingDepts = deptPeriods !== undefined ? deptPeriods : parseDeptPeriods(str);
+  const existingBilling = billingConfig !== undefined ? billingConfig : parseBillingConfig(str);
+  const existingBills = attachedBills !== undefined ? attachedBills : parseAttachedBills(str);
+
+  const baseProvider = str.split('###')[0].trim() || 'builtin';
+  let result = baseProvider;
+  if (Object.keys(existingStaff).length > 0) {
+    result += `###staff_targets:${JSON.stringify(existingStaff)}`;
+  }
+  if (Object.keys(existingDepts).length > 0) {
+    result += `###dept_periods:${JSON.stringify(existingDepts)}`;
+  }
+  if (existingBilling && typeof existingBilling === 'object') {
+    result += `###billing_config:${JSON.stringify(existingBilling)}`;
+  }
+  if (Object.keys(existingBills).length > 0) {
+    result += `###attached_bills:${JSON.stringify(existingBills)}`;
+  }
+  return result;
+}
+
 function packStaffTargets(aiProviderStr, newTargetsMap = {}) {
   const str = String(aiProviderStr || 'builtin');
   const existingMap = parseStaffTargets(str);
-  const deptPeriods = parseDeptPeriods(str);
   const merged = { ...existingMap };
   for (const [k, v] of Object.entries(newTargetsMap)) {
     if (v == null || v === '') {
@@ -116,32 +169,28 @@ function packStaffTargets(aiProviderStr, newTargetsMap = {}) {
       }
     }
   }
-  const baseProvider = str.split('###')[0].trim() || 'builtin';
-  let result = baseProvider;
-  if (Object.keys(merged).length > 0) {
-    result += `###staff_targets:${JSON.stringify(merged)}`;
-  }
-  if (Object.keys(deptPeriods).length > 0) {
-    result += `###dept_periods:${JSON.stringify(deptPeriods)}`;
-  }
-  return result;
+  return packAllMeta(str, { staffTargets: merged });
 }
 
 function packDeptPeriods(aiProviderStr, newPeriodsMap = {}) {
   const str = String(aiProviderStr || 'builtin');
-  const staffTargets = parseStaffTargets(str);
   const existingPeriods = parseDeptPeriods(str);
   const merged = { ...existingPeriods, ...newPeriodsMap };
-  const baseProvider = str.split('###')[0].trim() || 'builtin';
+  return packAllMeta(str, { deptPeriods: merged });
+}
 
-  let result = baseProvider;
-  if (Object.keys(staffTargets).length > 0) {
-    result += `###staff_targets:${JSON.stringify(staffTargets)}`;
-  }
-  if (Object.keys(merged).length > 0) {
-    result += `###dept_periods:${JSON.stringify(merged)}`;
-  }
-  return result;
+function packBillingConfig(aiProviderStr, newConfig = {}) {
+  const str = String(aiProviderStr || 'builtin');
+  const current = parseBillingConfig(str);
+  const merged = { ...current, ...newConfig };
+  return packAllMeta(str, { billingConfig: merged });
+}
+
+function packAttachedBills(aiProviderStr, newBillsMap = {}) {
+  const str = String(aiProviderStr || 'builtin');
+  const current = parseAttachedBills(str);
+  const merged = { ...current, ...newBillsMap };
+  return packAllMeta(str, { attachedBills: merged });
 }
 
 module.exports = {
@@ -154,5 +203,9 @@ module.exports = {
   packStaffTargets,
   parseDeptPeriods,
   packDeptPeriods,
+  parseBillingConfig,
+  packBillingConfig,
+  parseAttachedBills,
+  packAttachedBills,
 };
 

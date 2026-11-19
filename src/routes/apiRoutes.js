@@ -508,5 +508,36 @@ router.post('/billing/create-invoice', async (req, res, next) => {
   }
 });
 
+// Staff Bill Attachment & Scanning with Duplicate Protection
+router.post('/employees/attach-bill', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const result = await repo.attachBill(req.body || {});
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/bills/attach', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const result = await repo.attachBill(req.body || {});
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/bills/attached', async (req, res, next) => {
+  try {
+    const repo = getRepository();
+    const bills = await repo.getAttachedBills();
+    res.json({ bills });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
 

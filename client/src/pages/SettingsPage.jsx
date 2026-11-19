@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ArrowLeft, Sliders, Store, Building2, Users, Plus, UserPlus, Pencil, Trash2, Search, X, AlertTriangle,
+  ArrowLeft, Sliders, Store, Building2, Users, Plus, UserPlus, Pencil, Trash2, Search, X, AlertTriangle, UploadCloud,
 } from 'lucide-react';
 import { api, formatInr, formatDate } from '../api/client';
 import DepartmentModal from '../components/DepartmentModal';
 import EmployeeFormModal from '../components/EmployeeFormModal';
 import EmployeeAvatar from '../components/EmployeeAvatar';
 import RewardlyLoader from '../components/RewardlyLoader';
+import CsvImportModal from '../components/CsvImportModal';
 
 function getNextEmpCode(employees) {
   let maxNum = 0;
@@ -43,6 +44,7 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [csvModalOpen, setCsvModalOpen] = useState(false);
 
   async function loadSettings({ silent = false } = {}) {
     if (!silent) setLoading(true);
@@ -446,6 +448,79 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
               onChange={(e) => setShop({ ...shop, owner_name: e.target.value })}
             />
           </div>
+
+          {/* Using Internal billing System Toggle */}
+          <div className="field" style={{ marginTop: 4 }}>
+            <label className="field-label" style={{ fontWeight: 600, color: 'var(--text-main, #1e293b)' }}>
+              Using Internal billing System
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 4 }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                <input
+                  type="radio"
+                  name="use_internal_billing"
+                  value="yes"
+                  checked={shop?.use_internal_billing !== false}
+                  onChange={() => setShop({ ...shop, use_internal_billing: true })}
+                />
+                <span>Yes (Built-in POS)</span>
+              </label>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                <input
+                  type="radio"
+                  name="use_internal_billing"
+                  value="no"
+                  checked={shop?.use_internal_billing === false}
+                  onChange={() => setShop({ ...shop, use_internal_billing: false })}
+                />
+                <span>No (External Billing / ERP)</span>
+              </label>
+            </div>
+
+            {shop?.use_internal_billing === false && (
+              <div
+                style={{
+                  marginTop: 10,
+                  padding: '12px 14px',
+                  background: 'linear-gradient(135deg, rgba(238, 242, 255, 0.9) 0%, rgba(245, 243, 255, 0.9) 100%)',
+                  borderRadius: 12,
+                  border: '1.5px dashed #a5b4fc',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#3730a3' }}>
+                    External Billing Active
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#4b5563', marginTop: 2 }}>
+                    Offline or third-party POS. Import external sales / billing records.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => setCsvModalOpen(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 14px',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    boxShadow: '0 2px 8px rgba(109, 40, 217, 0.25)',
+                  }}
+                >
+                  <UploadCloud size={14} />
+                  <span>Import data from other source</span>
+                </button>
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
             <button type="submit" className="btn btn-primary" disabled={savingShop}>
               {savingShop ? 'Saving...' : 'Save Showroom Profile'}
@@ -774,6 +849,16 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
           </div>
         </div>
       )}
+      {/* CSV Import Modal for External Billing */}
+      <CsvImportModal
+        isOpen={csvModalOpen}
+        onClose={() => setCsvModalOpen(false)}
+        onSuccess={(res) => {
+          showToast(`Successfully imported ${res?.inserted ?? 0} sales rows!`);
+          loadSettings({ silent: true });
+          onSettingsSaved?.();
+        }}
+      />
     </div>
   );
 }

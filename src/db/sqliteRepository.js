@@ -18,6 +18,10 @@ const {
   packStaffTargets,
   parseDeptPeriods,
   packDeptPeriods,
+  parseBillingConfig,
+  packBillingConfig,
+  parseAttachedBills,
+  packAttachedBills,
 } = require('../utils/authUtils');
 
 class SqliteRepository {
@@ -56,8 +60,14 @@ class SqliteRepository {
       reward_recommendations: this.db.prepare('SELECT COUNT(*) AS c FROM reward_recommendations').get().c,
     };
 
+    const settingsRow = this.db.prepare('SELECT ai_provider FROM scoring_settings LIMIT 1').get();
+    const billingConfig = parseBillingConfig(settingsRow?.ai_provider);
+
     return {
-      shop,
+      shop: {
+        ...shop,
+        use_internal_billing: billingConfig.use_internal_billing,
+      },
       dateBounds: {
         minDate: bounds?.min_date || '2026-07-12',
         maxDate: bounds?.max_date || '2026-11-11',
@@ -371,14 +381,20 @@ class SqliteRepository {
 
   async getSettings() {
     const row = this.db.prepare('SELECT * FROM scoring_settings LIMIT 1').get();
+    const billingConfig = parseBillingConfig(row?.ai_provider);
     return {
       ...row,
       require_export_token: Boolean(row.require_export_token),
+      use_internal_billing: billingConfig.use_internal_billing,
     };
   }
 
   async updateSettings(patch) {
     const current = await this.getSettings();
+    let aiProvider = patch.ai_provider ?? current.ai_provider;
+    if (patch.use_internal_billing !== undefined) {
+      aiProvider = packBillingConfig(aiProvider, { use_internal_billing: Boolean(patch.use_internal_billing) });
+    }
     const next = {
       sales_weight: patch.sales_weight ?? current.sales_weight,
       attendance_weight: patch.attendance_weight ?? current.attendance_weight,
@@ -390,7 +406,7 @@ class SqliteRepository {
       require_export_token: patch.require_export_token !== undefined
         ? (patch.require_export_token ? 1 : 0)
         : (current.require_export_token ? 1 : 0),
-      ai_provider: patch.ai_provider ?? current.ai_provider,
+      ai_provider: aiProvider,
     };
 
     this.db.prepare(`
@@ -417,6 +433,13 @@ class SqliteRepository {
 
   async updateShop(patch) {
     const { shop } = await this.getShopAndMeta();
+    if (patch.use_internal_billing !== undefined) {
+      const currentSettings = await this.getSettings();
+      const updatedAi = packBillingConfig(currentSettings.ai_provider, {
+        use_internal_billing: Boolean(patch.use_internal_billing),
+      });
+      await this.updateSettings({ ai_provider: updatedAi });
+    }
     this.db.prepare(`
       UPDATE shops
       SET name = ?, tagline = ?, location = ?, city = ?, owner_name = ?
@@ -833,6 +856,103 @@ class SqliteRepository {
     }
 
     return { inserted, skipped };
+  }
+
+  async getAttachedBills() {
+    const settings = await this.getSettings();
+    return parseAttachedBills(settings.ai_provider);
+  }
+
+  async attachBill(payload = {}) {
+    const rawBillId = String(payload.bill_id || payload.invoice_no || '').trim();
+    if (!rawBillId) {
+      throw httpError(400, 'Bill ID / Receipt # is required to attach a bill.');
+    }
+    const normalizedBillId = rawBillId.toUpperCase();
+
+    const amount = Math.round(Number(payload.amount ?? payload.net_amount ?? payload.gross_amount ?? 0));
+    if (isNaN(amount) || amount <= 0) {
+      throw httpError(400, 'A valid bill amount (₹) greater than 0 is required.');
+    }
+
+    const { shop } = await this.getShopAndMeta();
+    const settings = await this.getSettings();
+    const attachedBills = parseAttachedBills(settings.ai_provider);
+
+    // Duplicate check: Bill can only be attached ONCE across the entire showroom
+    if (attachedBills[normalizedBillId]) {
+      const existing = attachedBills[normalizedBillId];
+      throw httpError(
+        409,
+        `Bill "${normalizedBillId}" has already been attached and claimed by ${existing.employee_name || 'another staff member'} (${existing.emp_code || 'RW'}) on ${existing.date || 'a previous date'}. Duplicate bills are not permitted.`
+      );
+    }
+
+    // Lookup employee
+    const empRef = String(payload.employee_id || payload.emp_code || '').trim();
+    if (!empRef) {
+      throw httpError(400, 'Employee attribution is required to attach bill.');
+    }
+
+    const empRow = this.db.prepare(`
+      SELECT e.*, d.code AS department_code, d.name AS department_name, d.color_hex AS department_color, d.target_monthly_sales
+      FROM employees e
+      JOIN departments d ON d.id = e.department_id
+      WHERE e.id = ? OR LOWER(e.emp_code) = LOWER(?)
+      LIMIT 1
+    `).get(empRef, empRef);
+
+    if (!empRow) {
+      throw httpError(404, `Staff member "${empRef}" not found.`);
+    }
+
+    const saleDate = payload.date || payload.sale_date || new Date().toISOString().slice(0, 10);
+    const category = payload.category || empRow.department_name || 'Showroom Sales';
+    const saleId = crypto.randomUUID();
+
+    // 1. Insert into sales_records to immediately credit staff's sales and department target contribution
+    this.db.prepare(`
+      INSERT INTO sales_records (id, shop_id, employee_id, sale_date, bills_count, items_sold, gross_amount_inr, returns_inr, net_amount_inr, upsell_count, category)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      saleId,
+      shop.id,
+      empRow.id,
+      saleDate,
+      1,
+      1,
+      amount,
+      0,
+      amount,
+      0,
+      category
+    );
+
+    // 2. Persist in attached_bills registry in ai_provider
+    const billEntry = {
+      bill_id: normalizedBillId,
+      original_bill_id: rawBillId,
+      employee_id: empRow.id,
+      emp_code: empRow.emp_code,
+      employee_name: empRow.full_name,
+      amount,
+      date: saleDate,
+      category,
+      created_at: new Date().toISOString(),
+      sale_id: saleId,
+    };
+
+    const updatedAi = packAttachedBills(settings.ai_provider, { [normalizedBillId]: billEntry });
+    await this.updateSettings({ ai_provider: updatedAi });
+
+    return {
+      success: true,
+      message: `Bill #${normalizedBillId} (₹${amount.toLocaleString('en-IN')}) attached successfully! Sales credited to ${empRow.full_name} (${empRow.emp_code}).`,
+      bill: billEntry,
+      sale_id: saleId,
+      employee: this._formatEmployee(empRow),
+      feedback_url: `/feedback/${encodeURIComponent(empRow.emp_code)}?bill=${encodeURIComponent(normalizedBillId)}&amount=${amount}`,
+    };
   }
 
   async resetAndReseed() {
