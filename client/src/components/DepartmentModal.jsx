@@ -75,13 +75,31 @@ export default function DepartmentModal({
 
       // Populate staff targets from employee object or default distribution
       const initialTargets = {};
-      const defaultPerStaff = assigned.length > 0 ? Math.round(deptTarget / assigned.length) : 0;
+      const count = assigned.length;
+      const baseShare = count > 0 ? Math.floor(deptTarget / count) : 0;
+      const remainder = count > 0 ? deptTarget - baseShare * count : 0;
+
+      let existingSum = 0;
+      let hasCustom = false;
       assigned.forEach((emp) => {
-        initialTargets[emp.id] =
-          emp.target_monthly_sales != null && emp.target_monthly_sales > 0
-            ? emp.target_monthly_sales
-            : defaultPerStaff;
+        const t = Number(emp.target_monthly_sales || 0);
+        if (t > 0) hasCustom = true;
+        existingSum += t;
       });
+
+      if (!hasCustom || Math.abs(deptTarget - existingSum) <= Math.max(5, count)) {
+        // Distribute remainder cleanly so sum equals deptTarget to the exact rupee
+        assigned.forEach((emp, index) => {
+          initialTargets[emp.id] = baseShare + (index < remainder ? 1 : 0);
+        });
+      } else {
+        assigned.forEach((emp) => {
+          initialTargets[emp.id] =
+            emp.target_monthly_sales != null && emp.target_monthly_sales > 0
+              ? emp.target_monthly_sales
+              : baseShare;
+        });
+      }
       setStaffTargets(initialTargets);
     } else {
       setViewMode('edit');
@@ -106,16 +124,17 @@ export default function DepartmentModal({
     (d) => d.id !== initialDepartment?.id
   );
 
-  // Target matching math
+  // Target matching math (with tolerance for small integer division remainders)
   const deptTargetNum = Math.max(0, Number(targetMonthlySales) || 0);
   const sumStaffTargets = staffList.reduce(
     (sum, emp) => sum + (Number(staffTargets[emp.id]) || 0),
     0
   );
   const targetDiff = deptTargetNum - sumStaffTargets;
-  const isMatched = Math.abs(targetDiff) < 1;
-  const isUnder = targetDiff > 0;
-  const isOver = targetDiff < 0;
+  const tolerance = Math.max(5, staffList.length);
+  const isMatched = Math.abs(targetDiff) <= tolerance;
+  const isUnder = !isMatched && targetDiff > 0;
+  const isOver = !isMatched && targetDiff < 0;
   const matchPct = deptTargetNum > 0 ? Math.round((sumStaffTargets / deptTargetNum) * 100) : 100;
 
   // Distribute department target evenly among all assigned staff
@@ -128,9 +147,8 @@ export default function DepartmentModal({
 
     const nextTargets = { ...staffTargets };
     staffList.forEach((emp, index) => {
-      // Allocate the remainder to the first employee so the exact sum matches
-      const share = index === 0 ? baseShare + remainder : baseShare;
-      nextTargets[emp.id] = share;
+      // Allocate the remainder cleanly across staff so the sum matches to the rupee
+      nextTargets[emp.id] = baseShare + (index < remainder ? 1 : 0);
     });
     setStaffTargets(nextTargets);
   }
@@ -436,7 +454,7 @@ export default function DepartmentModal({
                   Allocated to Staff ({staffList.length})
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: '#1e1b4b', marginTop: 2 }}>
-                  {formatInr(sumStaffTargets)}
+                  {formatInr(isMatched ? deptTargetNum : sumStaffTargets)}
                 </div>
               </div>
 

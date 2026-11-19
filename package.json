@@ -1,6 +1,6 @@
 {
   "name": "rewardly",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Rewardly - AI-Powered Employee Performance, Loyalty & Reward Recognition System for Textile Showrooms",
   "main": "server.js",
   "scripts": {

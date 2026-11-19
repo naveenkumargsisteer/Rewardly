@@ -510,16 +510,31 @@ async function getEmployeeDetail(employeeId, { startDate, endDate } = {}) {
     target_monthly_sales: 1000000,
   };
 
-  const monthlyDeptTarget = Number(empDept.target_monthly_sales || 1000000);
-  const proRatedDeptTarget = Math.round(monthlyDeptTarget * (daysSpan / 30));
-
   const deptStaffIds = new Set(
     allEmployees
       .filter((e) => e.department_id === empDept.id || e.department_code === empDept.code)
       .map((e) => e.id)
   );
 
-  const deptSales = activePeriodSales.filter(
+  // Targets are monthly sales targets set by showroom management in the department modal
+  const monthlyDeptTarget = Number(empDept.target_monthly_sales || 1000000);
+  const empIndividualMonthlyTarget = (Number(targetEmp.target_monthly_sales) > 0)
+    ? Number(targetEmp.target_monthly_sales)
+    : Math.round(monthlyDeptTarget / Math.max(1, deptStaffIds.size));
+
+  // Determine the target evaluation slice:
+  // For monthly targets, if a multi-month period ("full time", etc., > 35 days) is filtered,
+  // the target tracking evaluates the active month of resolvedEnd (e.g. current month).
+  let targetPeriodSales = activePeriodSales;
+  let targetEmpSales = empSales;
+
+  if (daysSpan > 35) {
+    const activeMonthPrefix = resolvedEnd.slice(0, 7); // e.g. "2026-11"
+    targetPeriodSales = activePeriodSales.filter((s) => String(s.sale_date).startsWith(activeMonthPrefix));
+    targetEmpSales = empSales.filter((s) => String(s.sale_date).startsWith(activeMonthPrefix));
+  }
+
+  const deptSales = targetPeriodSales.filter(
     (s) => deptStaffIds.has(s.employee_id) || s.department_id === empDept.id || s.department_code === empDept.code
   );
 
@@ -529,47 +544,50 @@ async function getEmployeeDetail(employeeId, { startDate, endDate } = {}) {
   }
   deptActualSalesInr = Math.round(deptActualSalesInr);
 
-  const empNetSalesInr = employeeSummary?.metrics?.netSalesInr || 0;
-  const empIndividualMonthlyTarget = (Number(targetEmp.target_monthly_sales) > 0)
-    ? Number(targetEmp.target_monthly_sales)
-    : Math.round(monthlyDeptTarget / Math.max(1, deptStaffIds.size));
-  const empIndividualProRatedTarget = Math.round(empIndividualMonthlyTarget * (daysSpan / 30));
+  let empNetSalesInr = 0;
+  let empBillsCount = 0;
+  for (const s of targetEmpSales) {
+    empNetSalesInr += Number(s.net_amount_inr || 0);
+    empBillsCount += Number(s.bills_count || 1);
+  }
+  empNetSalesInr = Math.round(empNetSalesInr);
+  const avgBillValueInr = empBillsCount > 0 ? Math.round(empNetSalesInr / empBillsCount) : 0;
 
-  const empContributionToDeptTargetPct = proRatedDeptTarget > 0
-    ? round1((empNetSalesInr / proRatedDeptTarget) * 100)
+  const empContributionToDeptTargetPct = monthlyDeptTarget > 0
+    ? round1((empNetSalesInr / monthlyDeptTarget) * 100)
     : 0;
 
   const empContributionToActualSalesPct = deptActualSalesInr > 0
     ? round1((empNetSalesInr / deptActualSalesInr) * 100)
     : 0;
 
-  const deptTargetAchievedPct = proRatedDeptTarget > 0
-    ? round1((deptActualSalesInr / proRatedDeptTarget) * 100)
+  const deptTargetAchievedPct = monthlyDeptTarget > 0
+    ? round1((deptActualSalesInr / monthlyDeptTarget) * 100)
     : 100;
 
-  const empIndividualTargetPct = empIndividualProRatedTarget > 0
-    ? round1((empNetSalesInr / empIndividualProRatedTarget) * 100)
+  const empIndividualTargetPct = empIndividualMonthlyTarget > 0
+    ? round1((empNetSalesInr / empIndividualMonthlyTarget) * 100)
     : 0;
 
-  const targetRemainingInr = Math.max(0, empIndividualProRatedTarget - empNetSalesInr);
+  const targetRemainingInr = Math.max(0, empIndividualMonthlyTarget - empNetSalesInr);
   const firstName = (targetEmp.full_name || '').split(/\s+/)[0] || 'Employee';
 
   const departmentAnalytics = {
     departmentName: empDept.name || targetEmp.department_name,
     departmentCode: empDept.code || targetEmp.department_code,
-    departmentTargetInr: proRatedDeptTarget,
+    departmentTargetInr: monthlyDeptTarget,
     monthlyDepartmentTargetInr: monthlyDeptTarget,
     deptActualSalesInr,
     deptTargetAchievedPct,
     employeeNetSalesInr: empNetSalesInr,
     contributionToDeptTargetPct: empContributionToDeptTargetPct,
     contributionToActualSalesPct: empContributionToActualSalesPct,
-    individualTargetInr: empIndividualProRatedTarget,
+    individualTargetInr: empIndividualMonthlyTarget,
     individualMonthlyTargetInr: empIndividualMonthlyTarget,
     individualTargetPct: empIndividualTargetPct,
     targetRemainingInr,
-    transactionsCount: employeeSummary?.metrics?.billsCount || 0,
-    avgBillValueInr: employeeSummary?.metrics?.avgBillValueInr || 0,
+    transactionsCount: empBillsCount,
+    avgBillValueInr,
     employeeFirstName: firstName,
   };
 

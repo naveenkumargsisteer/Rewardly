@@ -72,13 +72,13 @@ export default function EmployeePortalPage({
     minDate: '2026-07-12',
     maxDate: '2026-11-18',
   });
-  const [filterMode, setFilterMode] = useState('full'); // 'full' | 'month' | 'quarter' | 'year' | 'custom'
+  const [filterMode, setFilterMode] = useState('month'); // default to 'month' for monthly sales target tracking
   const [selectedMonth, setSelectedMonth] = useState('2026-11');
   const [selectedQuarter, setSelectedQuarter] = useState('2026-Q4');
   const [selectedYear, setSelectedYear] = useState('2026');
   const [dateRange, setDateRange] = useState({
-    startDate: '',
-    endDate: '',
+    startDate: '2026-11-01',
+    endDate: '2026-11-19',
   });
 
   // Fetch shop meta for active date bounds
