@@ -202,3 +202,4 @@ export default function GrowthChartCard({ monthlyTrend, kpis }) {
     </div>
   );
 }
+
