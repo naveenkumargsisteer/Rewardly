@@ -2174,10 +2174,30 @@ button, input, select, textarea {
   flex-wrap: wrap;
 }
 
+.emp-kpi-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 1024px) {
+  .emp-kpi-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .emp-kpi-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
 .emp-portal-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(320px, 1.2fr);
+  grid-template-columns: minmax(0, 1.22fr) minmax(320px, 1fr);
   gap: 20px;
+  align-items: start;
 }
 
 @media (max-width: 960px) {
@@ -2193,29 +2213,10 @@ button, input, select, textarea {
 }
 
 .emp-kpi-improvement-card {
-  grid-column: span 2;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 18px;
-}
-
-@media (max-width: 900px) {
-  .emp-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .emp-kpi-improvement-card {
-    grid-column: span 2;
-  }
-}
-
-@media (max-width: 600px) {
-  .emp-kpi-grid {
-    grid-template-columns: 1fr;
-  }
-  .emp-kpi-improvement-card {
-    grid-column: span 1;
-  }
+  padding: 22px;
 }
 
 /* ============================================================

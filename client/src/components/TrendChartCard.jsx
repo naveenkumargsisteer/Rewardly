@@ -5,7 +5,7 @@ import './chartSetup';
 import { formatCompactInr } from '../api/client';
 
 export default function TrendChartCard({ monthlyTrend }) {
-  const [metric, setMetric] = useState('performance'); // 'performance' | 'sales'
+  const [metric, setMetric] = useState('sales'); // default to 'sales' as shown in design
 
   const labels = (monthlyTrend || []).map((m) => m.shortLabel);
   const values = (monthlyTrend || []).map((m) =>
@@ -74,7 +74,7 @@ export default function TrendChartCard({ monthlyTrend }) {
       <div className="card-header">
         <div className="card-title-row">
           <TrendingUp size={17} color="#6d28d9" />
-          <span>{metric === 'performance' ? 'Performance & Recognition Trend' : 'Monthly Sales Revenue Trend'}</span>
+          <span>{metric === 'performance' ? 'Performance & Score Trend' : 'Monthly Sales Revenue Trend'}</span>
         </div>
         <div className="nav-pills" style={{ padding: 3 }}>
           <button

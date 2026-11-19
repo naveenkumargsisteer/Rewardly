@@ -745,285 +745,147 @@ export default function EmployeePortalPage({
         </div>
       </div>
 
-      {/* Main Grid */}
-      <div className="emp-portal-grid">
-        {/* Left Column: Metrics & Feedback */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Key Metric Tiles & Month-Wise Improvement Analytics */}
-          <div className="emp-kpi-grid">
-            <div className="card" style={{ padding: 18 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Composite Score</span>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: '#7c3aed',
-                    background: 'rgba(124, 58, 237, 0.1)',
-                    padding: '2px 7px',
-                    borderRadius: 12,
-                  }}
-                  title="Auto-updates live when new bills or customer ratings are submitted"
-                >
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed', display: 'inline-block', boxShadow: '0 0 6px #7c3aed' }}></span>
-                  Real-Time
-                </span>
-              </div>
-              <div
-                style={{
-                  fontSize: 28,
-                  fontWeight: 800,
-                  color: '#6d28d9',
-                  margin: '6px 0 2px',
-                }}
-              >
-                {scores.compositeScore != null ? `${scores.compositeScore}%` : '85%'}
-              </div>
-              <div style={{ fontSize: 11.5, color: '#10b981', fontWeight: 600 }}>
-                Rank #{detail?.employee?.rank || 1} in Showroom
-              </div>
-            </div>
-
-            <div className="card" style={{ padding: 18 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Net Sales Achieved</span>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: '#059669',
-                    background: 'rgba(16, 185, 129, 0.12)',
-                    padding: '2px 7px',
-                    borderRadius: 12,
-                  }}
-                  title="Auto-updates live as bills are generated at cashier counter"
-                >
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 6px #10b981' }}></span>
-                  Real-Time
-                </span>
-              </div>
-              <div
-                style={{
-                  fontSize: 24,
-                  fontWeight: 800,
-                  color: 'var(--text)',
-                  margin: '6px 0 2px',
-                }}
-              >
-                {metrics.netSalesInr != null ? formatInr(metrics.netSalesInr) : '₹0'}
-              </div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                Target Completion: {scores.salesScore != null ? `${scores.salesScore}%` : '0%'}
-              </div>
-            </div>
-
-            <div className="card" style={{ padding: 18 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-                Customer Rating
-              </div>
-              <div
-                style={{
-                  fontSize: 24,
-                  fontWeight: 800,
-                  color: '#f59e0b',
-                  margin: '6px 0 2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-              >
-                <Star size={20} fill="#f59e0b" color="#f59e0b" />
-                <span>
-                  {metrics.avgCustomerRating != null ? metrics.avgCustomerRating.toFixed(1) : '4.8'}
-                </span>
-                <span style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 500 }}>
-                  / 5.0
-                </span>
-              </div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                {metrics.feedbackCount || 0} customer reviews
-              </div>
-            </div>
-
-            <div
-              className="card"
+      {/* Top 4 KPI Metrics Row (Full Width) */}
+      <div className="emp-kpi-grid-4">
+        {/* Composite Score Card */}
+        <div className="card" style={{ padding: 18 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Composite Score</span>
+            <span
               style={{
-                padding: 18,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 10,
+                fontWeight: 700,
+                color: '#7c3aed',
+                background: 'rgba(124, 58, 237, 0.1)',
+                padding: '2px 7px',
+                borderRadius: 12,
+              }}
+              title="Auto-updates live when new bills or customer ratings are submitted"
+            >
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed', display: 'inline-block', boxShadow: '0 0 6px #7c3aed' }}></span>
+              Real-Time
+            </span>
+          </div>
+          <div
+            style={{
+              fontSize: 28,
+              fontWeight: 800,
+              color: '#6d28d9',
+              margin: '6px 0 2px',
+            }}
+          >
+            {scores.compositeScore != null ? `${scores.compositeScore}%` : '85%'}
+          </div>
+          <div style={{ fontSize: 11.5, color: '#10b981', fontWeight: 600 }}>
+            Rank #{detail?.employee?.rank || 1} in Showroom
+          </div>
+        </div>
+
+        {/* Net Sales Achieved Card */}
+        <div className="card" style={{ padding: 18 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Net Sales Achieved</span>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 10,
+                fontWeight: 700,
+                color: '#059669',
+                background: 'rgba(16, 185, 129, 0.12)',
+                padding: '2px 7px',
+                borderRadius: 12,
+              }}
+              title="Auto-updates live as bills are generated at cashier counter"
+            >
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 6px #10b981' }}></span>
+              Real-Time
+            </span>
+          </div>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 800,
+              color: 'var(--text)',
+              margin: '6px 0 2px',
+            }}
+          >
+            {metrics.netSalesInr != null ? formatInr(metrics.netSalesInr) : '₹0'}
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+            Target Completion: {scores.salesScore != null ? `${scores.salesScore}%` : '0%'}
+          </div>
+        </div>
+
+        {/* Customer Rating Card */}
+        <div className="card" style={{ padding: 18 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
+            Customer Rating
+          </div>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 800,
+              color: '#f59e0b',
+              margin: '6px 0 2px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <Star size={20} fill="#f59e0b" color="#f59e0b" />
+            <span>
+              {metrics.avgCustomerRating != null ? metrics.avgCustomerRating.toFixed(1) : '4.8'}
+            </span>
+            <span style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 500 }}>
+              / 5.0
+            </span>
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+            {metrics.feedbackCount || 0} customer reviews
+          </div>
+        </div>
+
+        {/* Attendance & Punctuality Card */}
+        <div
+          className="card"
+          style={{
+            padding: 18,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
+              Attendance &amp; Punctuality
+            </div>
+            <div
+              style={{
+                fontSize: 24,
+                fontWeight: 800,
+                color: '#10b981',
+                margin: '6px 0 2px',
               }}
             >
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>
-                  Attendance &amp; Punctuality
-                </div>
-                <div
-                  style={{
-                    fontSize: 24,
-                    fontWeight: 800,
-                    color: '#10b981',
-                    margin: '6px 0 2px',
-                  }}
-                >
-                  {scores.attendanceScore != null ? `${scores.attendanceScore}%` : '98%'}
-                </div>
-              </div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                {metrics.attendanceDaysPresent ?? 92} / {metrics.attendanceDaysExpected ?? 94} days
-                present
-              </div>
-            </div>
-
-            {/* Month-Wise Improvement Line Chart Card */}
-            <div className="card emp-kpi-improvement-card">
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  marginBottom: 6,
-                  flexWrap: 'wrap',
-                  gap: 8,
-                }}
-              >
-                <div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: 'var(--text-muted)',
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    <TrendingUp size={14} color={chartThemeColor} />
-                    Month-Wise Improvement Line Chart
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 3 }}>
-                    <span
-                      style={{
-                        fontSize: 22,
-                        fontWeight: 800,
-                        color: isUp ? '#10b981' : isDown ? '#f59e0b' : chartThemeColor,
-                      }}
-                    >
-                      {isScoreMode
-                        ? isUp
-                          ? `+${valDelta}%`
-                          : `${valDelta}%`
-                        : isUp
-                          ? `+${formatInr(valDelta)}`
-                          : `${formatInr(valDelta)}`}
-                    </span>
-                    <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                      {previousMonthData
-                        ? `MoM vs ${previousMonthData.label} (${isScoreMode ? `${prevVal}%` : formatInr(prevVal)})`
-                        : 'Tracking showroom trajectory'}
-                    </span>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {/* Metric Switcher Pills */}
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      background: '#f1f5f9',
-                      padding: 2,
-                      borderRadius: 8,
-                      border: '1px solid var(--border)',
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setTrendMetric('score')}
-                      style={{
-                        border: 'none',
-                        background: isScoreMode ? '#ffffff' : 'transparent',
-                        color: isScoreMode ? '#6d28d9' : 'var(--text-muted)',
-                        fontWeight: isScoreMode ? 700 : 500,
-                        padding: '3px 9px',
-                        borderRadius: 6,
-                        fontSize: 11,
-                        cursor: 'pointer',
-                        boxShadow: isScoreMode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      Score %
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTrendMetric('sales')}
-                      style={{
-                        border: 'none',
-                        background: !isScoreMode ? '#ffffff' : 'transparent',
-                        color: !isScoreMode ? '#059669' : 'var(--text-muted)',
-                        fontWeight: !isScoreMode ? 700 : 500,
-                        padding: '3px 9px',
-                        borderRadius: 6,
-                        fontSize: 11,
-                        cursor: 'pointer',
-                        boxShadow: !isScoreMode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      Sales ₹
-                    </button>
-                  </div>
-
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      padding: '3px 8px',
-                      borderRadius: 12,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      background: isUp ? '#ecfdf5' : isDown ? '#fffbeb' : '#f5f3ff',
-                      color: isUp ? '#065f46' : isDown ? '#b45309' : '#6d28d9',
-                    }}
-                  >
-                    {isUp ? (
-                      <>
-                        <TrendingUp size={12} /> Improving
-                      </>
-                    ) : isDown ? (
-                      <>
-                        <TrendingDown size={12} /> Needs Focus
-                      </>
-                    ) : (
-                      '⚖️ Stable'
-                    )}
-                  </span>
-                </div>
-              </div>
-
-              {/* Responsive Line Chart */}
-              <div
-                style={{
-                  height: 105,
-                  width: '100%',
-                  position: 'relative',
-                  marginTop: 6,
-                  paddingTop: 4,
-                  borderTop: '1px solid var(--border)',
-                }}
-              >
-                <Line data={lineChartData} options={lineChartOptions} />
-              </div>
+              {scores.attendanceScore != null ? `${scores.attendanceScore}%` : '98%'}
             </div>
           </div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+            {metrics.attendanceDaysPresent ?? 92} / {metrics.attendanceDaysExpected ?? 94} days
+            present
+          </div>
+        </div>
+      </div>
 
+      {/* Main Grid: Left Column (Feedback + Improvement Chart) | Right Column (Recognitions + Profile) */}
+      <div className="emp-portal-grid">
+        {/* Left Column: Recent Customer Feedback + Month-Wise Improvement Line Chart */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Customer Reviews & Feedback Card */}
           <div className="card" style={{ padding: 22 }}>
             <div
@@ -1138,7 +1000,152 @@ export default function EmployeePortalPage({
             )}
           </div>
 
-          {/* Recognitions Received */}
+          {/* Month-Wise Improvement Line Chart Card */}
+          <div className="card" style={{ padding: 22 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: 12,
+                flexWrap: 'wrap',
+                gap: 8,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: 'var(--text-muted)',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <TrendingUp size={15} color={chartThemeColor} />
+                  Month-Wise Improvement Line Chart
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+                  <span
+                    style={{
+                      fontSize: 22,
+                      fontWeight: 800,
+                      color: isUp ? '#10b981' : isDown ? '#f59e0b' : chartThemeColor,
+                    }}
+                  >
+                    {isScoreMode
+                      ? isUp
+                        ? `+${valDelta}%`
+                        : `${valDelta}%`
+                      : isUp
+                        ? `+${formatInr(valDelta)}`
+                        : `${formatInr(valDelta)}`}
+                  </span>
+                  <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                    {previousMonthData
+                      ? `MoM vs ${previousMonthData.label} (${isScoreMode ? `${prevVal}%` : formatInr(prevVal)})`
+                      : 'Tracking showroom trajectory'}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {/* Metric Switcher Pills */}
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    background: '#f1f5f9',
+                    padding: 2,
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setTrendMetric('score')}
+                    style={{
+                      border: 'none',
+                      background: isScoreMode ? '#ffffff' : 'transparent',
+                      color: isScoreMode ? '#6d28d9' : 'var(--text-muted)',
+                      fontWeight: isScoreMode ? 700 : 500,
+                      padding: '3px 9px',
+                      borderRadius: 6,
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      boxShadow: isScoreMode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    Score %
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTrendMetric('sales')}
+                    style={{
+                      border: 'none',
+                      background: !isScoreMode ? '#ffffff' : 'transparent',
+                      color: !isScoreMode ? '#059669' : 'var(--text-muted)',
+                      fontWeight: !isScoreMode ? 700 : 500,
+                      padding: '3px 9px',
+                      borderRadius: 6,
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      boxShadow: !isScoreMode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    Sales ₹
+                  </button>
+                </div>
+
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '3px 8px',
+                    borderRadius: 12,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    background: isUp ? '#ecfdf5' : isDown ? '#fffbeb' : '#f5f3ff',
+                    color: isUp ? '#065f46' : isDown ? '#b45309' : '#6d28d9',
+                  }}
+                >
+                  {isUp ? (
+                    <>
+                      <TrendingUp size={12} /> Improving
+                    </>
+                  ) : isDown ? (
+                    <>
+                      <TrendingDown size={12} /> Needs Focus
+                    </>
+                  ) : (
+                    '⚖️ Stable'
+                  )}
+                </span>
+              </div>
+            </div>
+
+            {/* Responsive Line Chart */}
+            <div
+              style={{
+                height: 160,
+                width: '100%',
+                position: 'relative',
+                marginTop: 8,
+                paddingTop: 8,
+                borderTop: '1px solid var(--border)',
+              }}
+            >
+              <Line data={lineChartData} options={lineChartOptions} />
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Peer & Manager Recognitions + Profile Details */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Recognitions Received Card */}
           <div className="card" style={{ padding: 22 }}>
             <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 700 }}>
               Peer &amp; Manager Recognitions ({recognitions.length})
@@ -1184,10 +1191,7 @@ export default function EmployeePortalPage({
               </div>
             )}
           </div>
-        </div>
 
-        {/* Right Column: Profile Overview & Performance Breakdown */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Profile Details Card */}
           <div className="card" style={{ padding: 22 }}>
             <div

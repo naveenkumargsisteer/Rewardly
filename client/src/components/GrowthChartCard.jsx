@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bar, Line } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 import { TrendingUp, ArrowUpRight, Zap, Target } from 'lucide-react';
 import './chartSetup';
 import { formatCompactInr } from '../api/client';
@@ -8,17 +8,16 @@ export default function GrowthChartCard({ monthlyTrend, kpis }) {
   const [mode, setMode] = useState('growth'); // 'growth' | 'sales'
 
   const list = (monthlyTrend || []).length > 0 ? monthlyTrend : [
-    { shortLabel: 'Jul', netSalesInr: 4460000, performanceScore: 85.5 },
-    { shortLabel: 'Aug', netSalesInr: 7731800, performanceScore: 88.6 },
-    { shortLabel: 'Sep', netSalesInr: 8661900, performanceScore: 91.0 },
-    { shortLabel: 'Oct', netSalesInr: 11067700, performanceScore: 92.6 },
-    { shortLabel: 'Nov', netSalesInr: 4808993, performanceScore: 87.2 },
+    { shortLabel: 'Jul', label: 'Jul 2026', netSalesInr: 4460000, performanceScore: 85.5 },
+    { shortLabel: 'Aug', label: 'Aug 2026', netSalesInr: 7731800, performanceScore: 88.6 },
+    { shortLabel: 'Sep', label: 'Sep 2026', netSalesInr: 8661900, performanceScore: 91.0 },
+    { shortLabel: 'Oct', label: 'Oct 2026', netSalesInr: 11067700, performanceScore: 92.6 },
+    { shortLabel: 'Nov', label: 'Nov 2026', netSalesInr: 4808993, performanceScore: 87.2 },
   ];
 
   // Compute MoM Growth for each bucket
   const growthPoints = list.map((m, idx) => {
     if (idx === 0) {
-      // First bucket baseline growth vs previous quarter
       return 14.5;
     }
     const prev = list[idx - 1];
@@ -40,27 +39,33 @@ export default function GrowthChartCard({ monthlyTrend, kpis }) {
     labels,
     datasets: [
       {
-        label: mode === 'growth' ? 'MoM Growth Rate (%)' : 'Net Sales Revenue (₹ Lakhs)',
+        label: mode === 'growth' ? 'MoM Growth Rate (%)' : 'Monthly Sales Revenue (₹ Lakhs)',
         data: mode === 'growth'
           ? growthPoints
           : list.map((m) => Math.round(m.netSalesInr / 100000)),
+        borderColor: mode === 'growth' ? '#10b981' : '#6d28d9',
         backgroundColor: (ctx) => {
           const chart = ctx.chart;
           const { ctx: c, chartArea } = chart;
-          if (!chartArea) return mode === 'growth' ? '#10b981' : '#6d28d9';
+          if (!chartArea) return mode === 'growth' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(109, 40, 217, 0.12)';
           const grad = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
           if (mode === 'growth') {
-            grad.addColorStop(0, 'rgba(16, 185, 129, 0.95)');
-            grad.addColorStop(1, 'rgba(5, 150, 105, 0.65)');
+            grad.addColorStop(0, 'rgba(16, 185, 129, 0.28)');
+            grad.addColorStop(1, 'rgba(16, 185, 129, 0.01)');
           } else {
-            grad.addColorStop(0, 'rgba(109, 40, 217, 0.95)');
-            grad.addColorStop(1, 'rgba(147, 51, 234, 0.65)');
+            grad.addColorStop(0, 'rgba(109, 40, 217, 0.28)');
+            grad.addColorStop(1, 'rgba(109, 40, 217, 0.01)');
           }
           return grad;
         },
-        borderRadius: 8,
-        borderSkipped: false,
-        barThickness: 28,
+        fill: true,
+        tension: 0.36,
+        borderWidth: 2.5,
+        pointBackgroundColor: '#ffffff',
+        pointBorderColor: mode === 'growth' ? '#10b981' : '#6d28d9',
+        pointBorderWidth: 2.5,
+        pointRadius: 5,
+        pointHoverRadius: 7,
       },
     ],
   };
@@ -101,23 +106,25 @@ export default function GrowthChartCard({ monthlyTrend, kpis }) {
     <div className="card">
       <div className="card-header">
         <div className="card-title-row">
-          <TrendingUp size={17} color="#059669" />
-          <span>Showroom Growth Analytics</span>
+          <TrendingUp size={17} color={mode === 'growth' ? '#059669' : '#6d28d9'} />
+          <span>{mode === 'growth' ? 'Showroom Growth Analytics' : 'Monthly Sales Revenue Trend'}</span>
         </div>
         <div className="nav-pills" style={{ padding: 3 }}>
           <button
             type="button"
             className={`nav-pill ${mode === 'growth' ? 'active' : ''}`}
+            style={{ padding: '4px 10px', fontSize: 11 }}
             onClick={() => setMode('growth')}
           >
-            MoM Growth %
+            Growth %
           </button>
           <button
             type="button"
             className={`nav-pill ${mode === 'sales' ? 'active' : ''}`}
+            style={{ padding: '4px 10px', fontSize: 11 }}
             onClick={() => setMode('sales')}
           >
-            Sales (₹)
+            Sales ₹
           </button>
         </div>
       </div>
@@ -128,8 +135,8 @@ export default function GrowthChartCard({ monthlyTrend, kpis }) {
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
           gap: 8,
-          marginBottom: 12,
-          padding: '8px 12px',
+          marginBottom: 10,
+          padding: '6px 12px',
           background: '#f8fafc',
           borderRadius: 8,
           fontSize: 12,
@@ -138,8 +145,8 @@ export default function GrowthChartCard({ monthlyTrend, kpis }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div
             style={{
-              width: 22,
-              height: 22,
+              width: 20,
+              height: 20,
               borderRadius: 6,
               background: '#ecfdf5',
               display: 'flex',
@@ -147,19 +154,19 @@ export default function GrowthChartCard({ monthlyTrend, kpis }) {
               justifyContent: 'center',
             }}
           >
-            <ArrowUpRight size={13} color="#059669" />
+            <ArrowUpRight size={12} color="#059669" />
           </div>
           <div>
             <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Current Velocity</div>
-            <strong style={{ color: '#059669', fontSize: 13 }}>+{currentGrowth}%</strong>
+            <strong style={{ color: '#059669', fontSize: 12 }}>+{currentGrowth}%</strong>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div
             style={{
-              width: 22,
-              height: 22,
+              width: 20,
+              height: 20,
               borderRadius: 6,
               background: '#f3efff',
               display: 'flex',
@@ -167,19 +174,19 @@ export default function GrowthChartCard({ monthlyTrend, kpis }) {
               justifyContent: 'center',
             }}
           >
-            <Zap size={13} color="#6d28d9" />
+            <Zap size={12} color="#6d28d9" />
           </div>
           <div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Avg Monthly Growth</div>
-            <strong style={{ color: '#6d28d9', fontSize: 13 }}>+{avgGrowth}%</strong>
+            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Avg Growth</div>
+            <strong style={{ color: '#6d28d9', fontSize: 12 }}>+{avgGrowth}%</strong>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div
             style={{
-              width: 22,
-              height: 22,
+              width: 20,
+              height: 20,
               borderRadius: 6,
               background: '#fffbeb',
               display: 'flex',
@@ -187,19 +194,18 @@ export default function GrowthChartCard({ monthlyTrend, kpis }) {
               justifyContent: 'center',
             }}
           >
-            <Target size={13} color="#d97706" />
+            <Target size={12} color="#d97706" />
           </div>
           <div>
             <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Trajectory</div>
-            <strong style={{ color: '#d97706', fontSize: 13 }}>High Expansion</strong>
+            <strong style={{ color: '#d97706', fontSize: 12 }}>High Expansion</strong>
           </div>
         </div>
       </div>
 
-      <div style={{ height: 210 }}>
-        <Bar data={data} options={options} />
+      <div style={{ height: 215 }}>
+        <Line data={data} options={options} />
       </div>
     </div>
   );
 }
-

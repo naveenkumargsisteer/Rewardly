@@ -207,21 +207,23 @@ export default function DashboardPage({
 
             {dashboardTab === 'static' ? (
               <>
+                {/* Row 1: Top Recognized Employees (FIRST) paired with Monthly Sales Revenue Trend */}
                 <div className="charts-grid-2">
-                  <TrendChartCard monthlyTrend={dashboard?.monthlyTrend} />
-                  <DeptBarChartCard departments={dashboard?.departmentBreakdown} />
-                </div>
-
-                <div className="charts-grid-2" style={{ marginTop: 16 }}>
                   <TopEmployeesCard
                     employees={dashboard?.employeesRanked}
                     onViewAll={onViewAllEmployees}
                     onSelectEmployee={onSelectEmployee}
                   />
+                  <TrendChartCard monthlyTrend={dashboard?.monthlyTrend} />
+                </div>
+
+                {/* Row 2: Showroom Growth Analytics & Department Breakdown */}
+                <div className="charts-grid-2" style={{ marginTop: 16 }}>
                   <GrowthChartCard
                     monthlyTrend={dashboard?.monthlyTrend}
                     kpis={dashboard?.kpis}
                   />
+                  <DeptBarChartCard departments={dashboard?.departmentBreakdown} />
                 </div>
               </>
             ) : (
