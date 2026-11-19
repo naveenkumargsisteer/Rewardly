@@ -1,17 +1,76 @@
 import React, { useState } from 'react';
 import {
-  Sparkles,
-  Send,
+  Award,
   CheckCircle2,
-  XCircle,
-  Lightbulb,
-  GripVertical,
-  Plus,
-  ChevronUp,
   ChevronDown,
+  ChevronUp,
+  Compass,
+  GripVertical,
+  Lightbulb,
+  Plus,
+  Send,
+  Sparkles,
+  Star,
+  TrendingUp,
+  Users,
+  XCircle,
+  Zap,
 } from 'lucide-react';
 import CustomChartRenderer, { CHART_TYPE_OPTIONS } from './CustomChartRenderer';
 import { api } from '../api/client';
+
+export const RECOGNITION_AWARD_CATEGORIES = [
+  { id: 'all', label: 'All', icon: Sparkles, color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' },
+  { id: 'spotlight', label: 'Employee Spotlight', icon: Award, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+  { id: 'customer_excellence', label: 'Customer Excellence Champion', icon: Star, color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+  { id: 'sales_achievement', label: 'Sales Achievement Recognition', icon: TrendingUp, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
+  { id: 'teamwork', label: 'Teamwork Recognition', icon: Users, color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd' },
+  { id: 'growth_leadership', label: 'Growth & Leadership Opportunity', icon: Compass, color: '#c026d3', bg: '#fdf4ff', border: '#f5d0fe' },
+];
+
+const AWARD_MAPPING_BY_TITLE = {
+  'Diwali Bridal Champion Bonus': 'Sales Achievement Recognition',
+  'Kanjeevaram Excellence Award': 'Employee Spotlight',
+  'Menswear Leadership Trophy': 'Growth & Leadership Opportunity',
+  'Rising Star Festive Accelerator': 'Teamwork Recognition',
+  'Zero-Error POS & Loyalty Gold': 'Teamwork Recognition',
+  'Q3 Silk Mastery Voucher': 'Sales Achievement Recognition',
+  'Kids Floor Customer Hero': 'Customer Excellence Champion',
+  'Customer Smile Ambassador': 'Customer Excellence Champion',
+};
+
+export function getRewardAwardCategory(reward) {
+  if (reward.award_type || reward.award_category) {
+    return reward.award_type || reward.award_category;
+  }
+  const cleanTitle = (reward.reward_title || '').trim();
+  if (AWARD_MAPPING_BY_TITLE[cleanTitle]) {
+    return AWARD_MAPPING_BY_TITLE[cleanTitle];
+  }
+  for (const [key, val] of Object.entries(AWARD_MAPPING_BY_TITLE)) {
+    if (cleanTitle.toLowerCase().includes(key.toLowerCase())) {
+      return val;
+    }
+  }
+  const t = cleanTitle.toLowerCase();
+  const r = (reward.rationale || '').toLowerCase();
+  if (t.includes('spotlight') || t.includes('star of the month') || t.includes('icon') || t.includes('excellence award')) {
+    return 'Employee Spotlight';
+  }
+  if (t.includes('customer') || t.includes('smile') || t.includes('delight') || r.includes('rating') || r.includes('reviews') || t.includes('hero')) {
+    return 'Customer Excellence Champion';
+  }
+  if (t.includes('sales') || t.includes('bonus') || t.includes('target') || t.includes('revenue') || t.includes('mastery') || t.includes('bridal champion')) {
+    return 'Sales Achievement Recognition';
+  }
+  if (t.includes('team') || t.includes('synergy') || t.includes('peer') || t.includes('pos') || t.includes('attendance') || t.includes('accelerator')) {
+    return 'Teamwork Recognition';
+  }
+  if (t.includes('leadership') || t.includes('growth') || t.includes('lead') || t.includes('opportunity') || t.includes('mentor') || t.includes('trophy')) {
+    return 'Growth & Leadership Opportunity';
+  }
+  return 'Employee Spotlight';
+}
 
 function renderFormattedText(text) {
   if (!text) return null;
@@ -58,8 +117,15 @@ export default function AiAssistantPanel({
   const [input, setInput] = useState('');
   const [selectedChartType, setSelectedChartType] = useState('auto');
   const [asking, setAsking] = useState(false);
+  const [selectedAwardCategory, setSelectedAwardCategory] = useState('all');
 
   const pendingRewards = (rewards || []).filter((r) => r.status === 'Pending');
+
+  const filteredRewards = (rewards || []).filter((r) => {
+    if (selectedAwardCategory === 'all') return true;
+    const catObj = RECOGNITION_AWARD_CATEGORIES.find((c) => c.id === selectedAwardCategory);
+    return getRewardAwardCategory(r) === catObj?.label;
+  });
 
   function handleGenerateWidget(chartSpec) {
     if (!chartSpec) return;
@@ -537,48 +603,211 @@ export default function AiAssistantPanel({
             </div>
           ))}
 
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 6 }}>
-            Reward Recommendations ({rewards?.length || 0})
-          </div>
-          {(rewards || []).map((r) => (
-            <div key={r.id} className="reward-queue-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{r.employee_name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    {r.department_name} • Score {r.composite_score}%
-                  </div>
-                </div>
-                <span className={`status-badge status-${r.status}`}>{r.status}</span>
+          {/* AI Recognition Recommendations Header */}
+          <div
+            style={{
+              marginTop: 14,
+              marginBottom: 8,
+              padding: '12px 14px',
+              background: 'linear-gradient(135deg, #f8f7ff 0%, #f3f0ff 100%)',
+              borderRadius: 12,
+              border: '1px solid #e9d5ff',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={16} color="#7c3aed" />
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#1e1b4b', letterSpacing: '-0.01em' }}>
+                  AI Recognition Recommendations
+                </span>
               </div>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--primary)' }}>
-                {r.reward_title} — ₹{Number(r.bonus_amount_inr).toLocaleString('en-IN')}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                {r.rationale}
-              </div>
-              {r.status === 'Pending' && (
-                <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
-                  <button
-                    type="button"
-                    className="btn btn-success btn-sm"
-                    onClick={() => onRewardAction(r.id, 'Approved')}
-                  >
-                    <CheckCircle2 size={13} />
-                    Approve Reward
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    onClick={() => onRewardAction(r.id, 'Dismissed')}
-                  >
-                    <XCircle size={13} />
-                    Dismiss
-                  </button>
-                </div>
-              )}
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  background: '#ecfdf5',
+                  color: '#065f46',
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  border: '1px solid #a7f3d0',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                <Zap size={11} color="#059669" />
+                Actionable
+              </span>
             </div>
-          ))}
+            <p style={{ margin: 0, fontSize: 11.5, color: '#6b7280', lineHeight: 1.45 }}>
+              Suggests personalised recognition based on employee achievements.
+            </p>
+          </div>
+
+          {/* 5 Award Category Pills */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 6,
+              overflowX: 'auto',
+              paddingBottom: 6,
+              marginBottom: 10,
+              scrollbarWidth: 'none',
+            }}
+          >
+            {RECOGNITION_AWARD_CATEGORIES.map((cat) => {
+              const IconComp = cat.icon;
+              const isSelected = selectedAwardCategory === cat.id;
+              const count =
+                cat.id === 'all'
+                  ? (rewards || []).length
+                  : (rewards || []).filter((r) => getRewardAwardCategory(r) === cat.label).length;
+
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setSelectedAwardCategory(cat.id)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '4px 10px',
+                    borderRadius: 20,
+                    fontSize: 11,
+                    fontWeight: isSelected ? 700 : 500,
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                    border: isSelected ? `1.5px solid ${cat.color}` : '1px solid #e2e8f0',
+                    background: isSelected ? cat.bg : '#ffffff',
+                    color: isSelected ? cat.color : '#64748b',
+                    boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title={cat.label}
+                >
+                  <IconComp size={12} color={isSelected ? cat.color : '#94a3b8'} />
+                  <span>{cat.label}</span>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: '1px 5px',
+                      borderRadius: 10,
+                      background: isSelected ? '#ffffff' : '#f1f5f9',
+                      color: isSelected ? cat.color : '#64748b',
+                    }}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Award Recommendations List */}
+          {filteredRewards.length === 0 ? (
+            <div
+              style={{
+                padding: '16px 12px',
+                textAlign: 'center',
+                background: '#f8fafc',
+                borderRadius: 12,
+                border: '1px dashed #cbd5e1',
+                fontSize: 12,
+                color: 'var(--text-muted)',
+              }}
+            >
+              No recommendations currently under this category.
+            </div>
+          ) : (
+            filteredRewards.map((r) => {
+              const awardCategory = getRewardAwardCategory(r);
+              const catConfig =
+                RECOGNITION_AWARD_CATEGORIES.find((c) => c.label === awardCategory) ||
+                RECOGNITION_AWARD_CATEGORIES[1];
+              const BadgeIcon = catConfig.icon;
+
+              return (
+                <div
+                  key={r.id}
+                  className="reward-queue-card"
+                  style={{
+                    borderLeft: `3.5px solid ${catConfig.color}`,
+                    background: '#ffffff',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Category Pill + Status Badge */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: 6,
+                        background: catConfig.bg,
+                        color: catConfig.color,
+                        border: `1px solid ${catConfig.border}`,
+                      }}
+                    >
+                      <BadgeIcon size={11} />
+                      {awardCategory}
+                    </span>
+                    <span className={`status-badge status-${r.status}`}>{r.status}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{r.employee_name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {r.department_name} • Score {r.composite_score}%
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#6d28d9', whiteSpace: 'nowrap' }}>
+                      ₹{Number(r.bonus_amount_inr).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: '#4338ca', marginBottom: 4 }}>
+                    {r.reward_title}
+                  </div>
+
+                  <div style={{ fontSize: 11.5, color: '#4b5563', lineHeight: 1.45, marginBottom: 8 }}>
+                    {r.rationale}
+                  </div>
+
+                  {r.status === 'Pending' && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                      <button
+                        type="button"
+                        className="btn btn-success btn-sm"
+                        onClick={() => onRewardAction(r.id, 'Approved')}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 11.5 }}
+                      >
+                        <CheckCircle2 size={13} />
+                        Approve Reward
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => onRewardAction(r.id, 'Dismissed')}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', fontSize: 11.5 }}
+                      >
+                        <XCircle size={13} />
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       )}
     </aside>
