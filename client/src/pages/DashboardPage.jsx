@@ -3,7 +3,6 @@ import { Calendar, Filter, Users, LayoutGrid, Sparkles } from 'lucide-react';
 import KpiCards from '../components/KpiCards';
 import TrendChartCard from '../components/TrendChartCard';
 import DeptBarChartCard from '../components/DeptBarChartCard';
-import RecognitionDonutCard from '../components/RecognitionDonutCard';
 import TopEmployeesCard from '../components/TopEmployeesCard';
 import CustomDashboardWorkspace, { DEFAULT_CUSTOM_WIDGETS } from '../components/CustomDashboardWorkspace';
 import AiAssistantPanel from '../components/AiAssistantPanel';
