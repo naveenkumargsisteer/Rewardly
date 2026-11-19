@@ -75,11 +75,44 @@ function isPasswordValid(inputPassword, storedHash, empCode = '') {
   return accepted.includes(pwd);
 }
 
+function parseStaffTargets(aiProviderStr) {
+  const str = String(aiProviderStr || '');
+  if (!str.includes('###staff_targets:')) {
+    return {};
+  }
+  try {
+    const raw = str.split('###staff_targets:')[1].split('###')[0];
+    return JSON.parse(raw) || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function packStaffTargets(aiProviderStr, newTargetsMap = {}) {
+  const str = String(aiProviderStr || 'builtin');
+  const existingMap = parseStaffTargets(str);
+  const merged = { ...existingMap };
+  for (const [k, v] of Object.entries(newTargetsMap)) {
+    if (v == null || v === '') {
+      delete merged[k];
+    } else {
+      const num = Number(v);
+      if (!isNaN(num) && num >= 0) {
+        merged[k] = Math.round(num);
+      }
+    }
+  }
+  const baseProvider = str.split('###staff_targets:')[0].trim() || 'builtin';
+  return `${baseProvider}###staff_targets:${JSON.stringify(merged)}`;
+}
+
 module.exports = {
   hashPassword,
   parsePhoneAndAuth,
   packPhoneAndAuth,
   getRoleCategory,
   isPasswordValid,
+  parseStaffTargets,
+  packStaffTargets,
 };
 

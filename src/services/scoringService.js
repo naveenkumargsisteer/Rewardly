@@ -88,7 +88,10 @@ function scoreEmployees({
       upsellCount += Number(s.upsell_count || 0);
     }
 
-    const proRatedTargetInr = Math.round((Number(dept.target_monthly_sales) / deptSize) * (daysInRange / 30));
+    const empMonthlyTarget = (Number(emp.target_monthly_sales) > 0)
+      ? Number(emp.target_monthly_sales)
+      : Math.round(Number(dept.target_monthly_sales || 1000000) / deptSize);
+    const proRatedTargetInr = Math.round(empMonthlyTarget * (daysInRange / 30));
     const targetAchievementPct = proRatedTargetInr > 0
       ? round1((netSalesInr / proRatedTargetInr) * 100)
       : 100;
@@ -164,10 +167,12 @@ function scoreEmployees({
       department_code: emp.department_code,
       department_name: emp.department_name,
       department_color: emp.department_color,
+      target_monthly_sales: Math.round(empMonthlyTarget),
       metrics: {
         grossSalesInr: Math.round(grossSalesInr),
         returnsInr: Math.round(returnsInr),
         netSalesInr: Math.round(netSalesInr),
+        monthlyTargetInr: Math.round(empMonthlyTarget),
         proRatedTargetInr,
         targetAchievementPct,
         billsCount,
@@ -190,6 +195,8 @@ function scoreEmployees({
       },
       scores: {
         salesScore,
+        targetInr: proRatedTargetInr,
+        monthlyTargetInr: Math.round(empMonthlyTarget),
         attendanceScore,
         feedbackScore,
         recognitionScore,

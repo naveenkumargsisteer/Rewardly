@@ -865,7 +865,9 @@ export default function EmployeePortalPage({
                   {metrics.netSalesInr != null ? formatInr(metrics.netSalesInr) : '₹0'}
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
-                  Target Completion: {scores.salesScore != null ? `${scores.salesScore}%` : '0%'}
+                  Target Completion: {metrics.targetAchievementPct != null ? `${metrics.targetAchievementPct}%` : (scores.salesScore != null ? `${scores.salesScore}%` : '0%')}
+                  <span style={{ margin: '0 5px' }}>•</span>
+                  Target: {formatInr(metrics.proRatedTargetInr || metrics.monthlyTargetInr || employee?.target_monthly_sales || scores.targetInr || 0)}
                 </div>
               </div>
 
@@ -1354,6 +1356,12 @@ export default function EmployeePortalPage({
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Department</span>
                 <strong>{employee?.department_name || 'Silk & Sarees'}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Monthly Target</span>
+                <strong style={{ color: 'var(--primary)', fontWeight: 700 }}>
+                  {formatInr(employee?.target_monthly_sales || metrics.monthlyTargetInr || scores.monthlyTargetInr || 0)}
+                </strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Shift Timings</span>

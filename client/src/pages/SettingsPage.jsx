@@ -598,9 +598,11 @@ export default function SettingsPage({ onBack, onSettingsSaved, showToast }) {
         initialDepartment={editingDept}
         assignedStaffCount={editingDept ? (deptEmployeeCounts[editingDept.id] || 0) : 0}
         mode={deptModalMode}
+        allEmployees={employees}
+        departments={departments}
         onClose={() => setDeptModalOpen(false)}
-        onSaved={(saved, isEdit) => {
-          handleDepartmentSaved(saved, isEdit);
+        onSaved={async (saved, isEdit) => {
+          await handleDepartmentSaved(saved, isEdit);
           setEditingDept(saved);
         }}
         onDelete={(dept) => {

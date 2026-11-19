@@ -13,6 +13,8 @@ const {
   packPhoneAndAuth,
   getRoleCategory,
   isPasswordValid,
+  parseStaffTargets,
+  packStaffTargets,
 } = require('../utils/authUtils');
 
 const DEFAULT_SETTINGS = {
@@ -175,13 +177,31 @@ class SupabaseRepository {
 
   async getEmployees() {
     await this.ensureSeededIfEmpty();
+    const settings = await this.getSettings();
+    const staffTargets = parseStaffTargets(settings.ai_provider);
+
     const { data, error } = await this.supabase
       .from('employees')
       .select('*, departments(code, name, color_hex, target_monthly_sales)')
       .order('emp_code', { ascending: true });
     if (error) throw new Error(`Supabase employees error: ${error.message}`);
 
-    return (data || []).map((row) => this._formatEmployeeRow(row));
+    const deptCounts = {};
+    for (const r of data || []) {
+      deptCounts[r.department_id] = (deptCounts[r.department_id] || 0) + 1;
+    }
+
+    return (data || []).map((row) => {
+      const formatted = this._formatEmployeeRow(row);
+      const deptSize = Math.max(1, deptCounts[row.department_id] || 1);
+      const deptTarget = Number(row.departments?.target_monthly_sales || 1000000);
+      const defaultTarget = Math.round(deptTarget / deptSize);
+      formatted.dept_target_monthly_sales = deptTarget;
+      formatted.target_monthly_sales = staffTargets[row.id] !== undefined
+        ? Number(staffTargets[row.id])
+        : defaultTarget;
+      return formatted;
+    });
   }
 
   async createDepartment(payload) {
@@ -205,6 +225,25 @@ class SupabaseRepository {
       .select()
       .single();
     if (error) throw new Error(`Supabase department create error: ${error.message}`);
+
+    if (payload.staff_targets && typeof payload.staff_targets === 'object') {
+      const currentSettings = await this.getSettings();
+      const updatedAi = packStaffTargets(currentSettings.ai_provider, payload.staff_targets);
+      await this.updateSettings({ ai_provider: updatedAi });
+    }
+
+    if (Array.isArray(payload.reassigned_employees)) {
+      for (const item of payload.reassigned_employees) {
+        if (item && item.id) {
+          const { error: moveErr } = await this.supabase
+            .from('employees')
+            .update({ department_id: item.department_id || row.id })
+            .eq('id', item.id);
+          if (moveErr) console.warn('Supabase staff reassign error:', moveErr.message);
+        }
+      }
+    }
+
     return data;
   }
 
@@ -232,15 +271,37 @@ class SupabaseRepository {
       }
     }
 
-    if (Object.keys(clean).length === 0) return current;
-    const { data, error } = await this.supabase
-      .from('departments')
-      .update(clean)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw new Error(`Supabase department update error: ${error.message}`);
-    return data;
+    let result = current;
+    if (Object.keys(clean).length > 0) {
+      const { data, error } = await this.supabase
+        .from('departments')
+        .update(clean)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw new Error(`Supabase department update error: ${error.message}`);
+      result = data;
+    }
+
+    if (payload.staff_targets && typeof payload.staff_targets === 'object') {
+      const currentSettings = await this.getSettings();
+      const updatedAi = packStaffTargets(currentSettings.ai_provider, payload.staff_targets);
+      await this.updateSettings({ ai_provider: updatedAi });
+    }
+
+    if (Array.isArray(payload.reassigned_employees)) {
+      for (const item of payload.reassigned_employees) {
+        if (item && item.id && item.department_id) {
+          const { error: moveErr } = await this.supabase
+            .from('employees')
+            .update({ department_id: item.department_id })
+            .eq('id', item.id);
+          if (moveErr) console.warn('Supabase staff reassign error:', moveErr.message);
+        }
+      }
+    }
+
+    return result;
   }
 
   async deleteDepartment(id) {

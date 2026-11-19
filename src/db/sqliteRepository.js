@@ -14,6 +14,8 @@ const {
   packPhoneAndAuth,
   getRoleCategory,
   isPasswordValid,
+  parseStaffTargets,
+  packStaffTargets,
 } = require('../utils/authUtils');
 
 class SqliteRepository {
@@ -80,13 +82,25 @@ class SqliteRepository {
   }
 
   _getEmployeeById(id) {
+    const settings = this.db.prepare('SELECT ai_provider FROM scoring_settings LIMIT 1').get();
+    const staffTargets = parseStaffTargets(settings?.ai_provider);
     const raw = this.db.prepare(`
-      SELECT e.*, d.code AS department_code, d.name AS department_name, d.color_hex AS department_color, d.target_monthly_sales
+      SELECT e.*, d.code AS department_code, d.name AS department_name, d.color_hex AS department_color, d.target_monthly_sales AS dept_target_monthly_sales
       FROM employees e
       JOIN departments d ON d.id = e.department_id
       WHERE e.id = ?
     `).get(id);
-    return this._formatEmployee(raw);
+    if (!raw) return null;
+    const formatted = this._formatEmployee(raw);
+    const deptCountRow = this.db.prepare('SELECT COUNT(*) AS c FROM employees WHERE department_id = ?').get(raw.department_id);
+    const deptSize = Math.max(1, deptCountRow?.c || 1);
+    const deptTarget = Number(raw.dept_target_monthly_sales || 1000000);
+    const defaultTarget = Math.round(deptTarget / deptSize);
+    formatted.dept_target_monthly_sales = deptTarget;
+    formatted.target_monthly_sales = staffTargets[raw.id] !== undefined
+      ? Number(staffTargets[raw.id])
+      : defaultTarget;
+    return formatted;
   }
 
   _requireDepartment(departmentId) {
@@ -96,13 +110,31 @@ class SqliteRepository {
   }
 
   async getEmployees() {
+    const settings = this.db.prepare('SELECT ai_provider FROM scoring_settings LIMIT 1').get();
+    const staffTargets = parseStaffTargets(settings?.ai_provider);
+
+    const counts = this.db.prepare('SELECT department_id, COUNT(*) AS c FROM employees GROUP BY department_id').all();
+    const deptSizeMap = {};
+    for (const row of counts) deptSizeMap[row.department_id] = row.c;
+
     const rows = this.db.prepare(`
-      SELECT e.*, d.code AS department_code, d.name AS department_name, d.color_hex AS department_color, d.target_monthly_sales
+      SELECT e.*, d.code AS department_code, d.name AS department_name, d.color_hex AS department_color, d.target_monthly_sales AS dept_target_monthly_sales
       FROM employees e
       JOIN departments d ON d.id = e.department_id
       ORDER BY e.emp_code ASC
     `).all();
-    return rows.map((r) => this._formatEmployee(r));
+
+    return rows.map((r) => {
+      const formatted = this._formatEmployee(r);
+      const deptSize = Math.max(1, deptSizeMap[r.department_id] || 1);
+      const deptTarget = Number(r.dept_target_monthly_sales || 1000000);
+      const defaultTarget = Math.round(deptTarget / deptSize);
+      formatted.dept_target_monthly_sales = deptTarget;
+      formatted.target_monthly_sales = staffTargets[r.id] !== undefined
+        ? Number(staffTargets[r.id])
+        : defaultTarget;
+      return formatted;
+    });
   }
 
   async createDepartment(payload) {
@@ -119,6 +151,22 @@ class SqliteRepository {
       INSERT INTO departments (id, shop_id, code, name, target_monthly_sales, color_hex)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(id, shop.id, clean.code, clean.name, clean.target_monthly_sales, clean.color_hex);
+
+    if (payload.staff_targets && typeof payload.staff_targets === 'object') {
+      const currentSettings = await this.getSettings();
+      const updatedAi = packStaffTargets(currentSettings.ai_provider, payload.staff_targets);
+      await this.updateSettings({ ai_provider: updatedAi });
+    }
+
+    if (Array.isArray(payload.reassigned_employees)) {
+      const reassignStmt = this.db.prepare('UPDATE employees SET department_id = ? WHERE id = ?');
+      for (const item of payload.reassigned_employees) {
+        if (item && item.id) {
+          reassignStmt.run(item.department_id || id, item.id);
+        }
+      }
+    }
+
     return this.db.prepare('SELECT * FROM departments WHERE id = ?').get(id);
   }
 
@@ -142,6 +190,22 @@ class SqliteRepository {
       SET code = ?, name = ?, target_monthly_sales = ?, color_hex = ?
       WHERE id = ?
     `).run(next.code, next.name, next.target_monthly_sales, next.color_hex, id);
+
+    if (payload.staff_targets && typeof payload.staff_targets === 'object') {
+      const currentSettings = await this.getSettings();
+      const updatedAi = packStaffTargets(currentSettings.ai_provider, payload.staff_targets);
+      await this.updateSettings({ ai_provider: updatedAi });
+    }
+
+    if (Array.isArray(payload.reassigned_employees)) {
+      const reassignStmt = this.db.prepare('UPDATE employees SET department_id = ? WHERE id = ?');
+      for (const item of payload.reassigned_employees) {
+        if (item && item.id && item.department_id) {
+          reassignStmt.run(item.department_id, item.id);
+        }
+      }
+    }
+
     return this.db.prepare('SELECT * FROM departments WHERE id = ?').get(id);
   }
 
