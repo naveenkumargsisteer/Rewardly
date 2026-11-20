@@ -123,26 +123,6 @@ export default function TopHeader({
           </>
         )}
 
-        {/* Staff Quick Action: Attach & Scan Bill */}
-        {(activePage === 'employee-portal' || roleCategory === 'staff') && (
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={() => window.dispatchEvent(new CustomEvent('rewardly:open_attach_bill'))}
-            style={{
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              border: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-            title="Attach & Scan showroom bill to credit sales"
-          >
-            <Receipt size={14} />
-            <span>Attach Bill</span>
-          </button>
-        )}
-
         {/* Notifications (Only for Admin / Floor Manager) */}
         {roleCategory === 'admin' && (
           <div ref={notifRef} style={{ position: 'relative' }}>

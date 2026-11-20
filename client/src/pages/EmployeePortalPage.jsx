@@ -368,6 +368,11 @@ export default function EmployeePortalPage({
   const recognitions = detail?.recentRecognitions || [];
   const feedbackList = detail?.recentFeedback || [];
   const monthlyProgression = detail?.monthlyProgression || [];
+
+  // Loyalty points conversion: e.g. loyalty score 45.7% -> 457 points (score * 10)
+  const loyaltyScoreVal = scores.compositeScore != null ? Number(scores.compositeScore) : 85;
+  const earnedLoyaltyPoints = Math.round(loyaltyScoreVal * 10);
+  const balanceLoyaltyPoints = earnedLoyaltyPoints;
   const deptAnalytics = detail?.departmentAnalytics || {
     departmentName: employee?.department_name || 'Silk & Sarees',
     departmentCode: employee?.department_code || 'SILK',
@@ -849,8 +854,8 @@ export default function EmployeePortalPage({
           </div>
         </div>
 
-        {/* 3-Card Filtered KPI Row */}
-        <div className="emp-kpi-grid-3">
+        {/* 4-Card Filtered KPI Row */}
+        <div className="emp-kpi-grid-4">
           {loadingDetail ? (
             <>
               {/* Net Sales Skeleton */}
@@ -882,6 +887,15 @@ export default function EmployeePortalPage({
                   <SkeletonBox width={90} height={30} style={{ margin: '8px 0' }} />
                 </div>
                 <SkeletonBox width={150} height={13} />
+              </div>
+
+              {/* Earned & Balance Points Skeleton */}
+              <div className="card" style={{ padding: 18, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <SkeletonBox width={140} height={14} style={{ marginBottom: 10 }} />
+                  <SkeletonBox width={95} height={30} style={{ margin: '8px 0' }} />
+                </div>
+                <SkeletonBox width={160} height={13} />
               </div>
             </>
           ) : (
@@ -982,6 +996,80 @@ export default function EmployeePortalPage({
                 <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
                   {metrics.attendanceDaysPresent ?? 92} / {metrics.attendanceDaysExpected ?? 94} days
                   present
+                </div>
+              </div>
+
+              {/* Earned & Balance Loyalty Points Card */}
+              <div
+                className="card"
+                style={{
+                  padding: 18,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--text-muted)',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>Earned &amp; Balance Points</span>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: '#7c3aed',
+                        background: 'rgba(124, 58, 237, 0.12)',
+                        padding: '2px 7px',
+                        borderRadius: 12,
+                      }}
+                      title="Points dynamically computed from Loyalty Score (10 pts per 1% score)"
+                    >
+                      <Sparkles size={11} color="#7c3aed" />
+                      {scores.tier || 'Silver'} Tier
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 24,
+                      fontWeight: 800,
+                      color: '#7c3aed',
+                      margin: '6px 0 2px',
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      gap: 6,
+                    }}
+                  >
+                    <span>{balanceLoyaltyPoints.toLocaleString('en-IN')}</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>pts balance</span>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    color: 'var(--text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    flexWrap: 'wrap',
+                    paddingTop: 2,
+                  }}
+                >
+                  <span>Earned: <strong style={{ color: '#10b981' }}>{earnedLoyaltyPoints.toLocaleString('en-IN')} pts</strong></span>
+                  <span>•</span>
+                  <span>Balance: <strong style={{ color: '#7c3aed' }}>{balanceLoyaltyPoints.toLocaleString('en-IN')} pts</strong></span>
                 </div>
               </div>
             </>
