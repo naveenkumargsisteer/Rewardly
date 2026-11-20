@@ -109,7 +109,7 @@ export default function AiAssistantPanel({
     {
       id: 'welcome',
       sender: 'bot',
-      text: "Hi! I'm your Rewardly AI assistant powered by live AI models. Ask me anything about employee scores, sales, attendance, or department performance — click '✨ Generate Widget' on any chart to pin it directly to your Custom Dashboard!",
+      text: "Hi! I'm your Rewardly AI assistant powered by live AI models. Ask me anything about employee scores, sales, attendance, or department performance — click '✨ Add To Dashboard ' on any chart to pin it directly to your Custom Dashboard!",
       suggestedNextSteps: INITIAL_PROMPTS,
       provider: 'AI Model (Online)',
     },
@@ -151,7 +151,7 @@ export default function AiAssistantPanel({
 
     const qLower = q.toLowerCase();
     const isWidgetRequest =
-      qLower.includes('generate widget') ||
+      qLower.includes('Add To Dashboard ') ||
       qLower.includes('create widget') ||
       qLower.includes('add widget') ||
       qLower.includes('make widget') ||
@@ -216,7 +216,7 @@ export default function AiAssistantPanel({
                 );
               }
             })
-            .catch(() => {});
+            .catch(() => { });
         } else {
           fetch('https://text.pollinations.ai/', {
             method: 'POST',
@@ -242,7 +242,7 @@ export default function AiAssistantPanel({
                 );
               }
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       }
     } catch (err) {
@@ -399,7 +399,7 @@ export default function AiAssistantPanel({
                           title="Generate and pin to Custom Dashboard"
                         >
                           <Sparkles size={11} />
-                          Generate Widget
+                          Add To Dashboard
                         </button>
                       )}
                     </div>
@@ -469,7 +469,7 @@ export default function AiAssistantPanel({
                             title="Generate and pin to Custom Dashboard"
                           >
                             <Sparkles size={11} />
-                            Generate Widget
+                            Add To Dashboard
                           </button>
                         </div>
                       </div>
@@ -508,7 +508,7 @@ export default function AiAssistantPanel({
                           }}
                         >
                           <Sparkles size={13} />
-                          Generate Widget
+                          Add To Dashboard
                         </button>
                       </div>
                     </div>
@@ -541,7 +541,7 @@ export default function AiAssistantPanel({
                 <div className="ai-bot-avatar loading">
                   <img src="/rewardly-logo.png" alt="Rewardly AI thinking" className="ai-logo-img" />
                 </div>
-                <div className="ai-bubble">Creating chart from showroom data...</div>
+                <div className="ai-bubble">Checking...</div>
               </div>
             )}
           </div>
