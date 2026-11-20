@@ -407,10 +407,10 @@ async function answerQuestion({ question, startDate, endDate, departmentCode = '
       datasets: qLower.includes('sales')
         ? [{ label: 'Net Sales (₹ Lakhs)', data: monthlyTrend.map((m) => Math.round((m.netSalesInr / 100000) * 10) / 10), color: '#10B981' }]
         : [
-            { label: 'Performance %', data: monthlyTrend.map((m) => m.performanceScore), color: '#7C3AED' },
-            { label: 'Attendance %', data: monthlyTrend.map((m) => m.attendanceRate), color: '#10B981' },
-            { label: 'Recognition %', data: monthlyTrend.map((m) => m.recognitionScore), color: '#3B82F6' },
-          ],
+          { label: 'Performance %', data: monthlyTrend.map((m) => m.performanceScore), color: '#7C3AED' },
+          { label: 'Attendance %', data: monthlyTrend.map((m) => m.attendanceRate), color: '#10B981' },
+          { label: 'Recognition %', data: monthlyTrend.map((m) => m.recognitionScore), color: '#3B82F6' },
+        ],
     };
     suggestedNextSteps = ['Show recognition trends by department', 'Top 10 recognized employees', 'Who deserves a festive bonus?'];
   } else {
@@ -462,7 +462,7 @@ async function answerQuestion({ question, startDate, endDate, departmentCode = '
 
   const finalGroundTruth = activeGroundTruth || defaultGroundTruth;
 
-  let aiProvider = 'AI Model (GPT-4o mini)';
+  let aiProvider = 'AI ';
   const llm = await tryExternalLlmSummary({
     question: q,
     groundTruthSummary: finalGroundTruth,

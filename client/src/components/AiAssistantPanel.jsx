@@ -191,7 +191,7 @@ export default function AiAssistantPanel({
           highlights: res.highlights,
           chart: res.chart,
           suggestedNextSteps: res.suggestedNextSteps,
-          provider: res.aiProvider || 'AI Model (GPT-4o mini)',
+          provider: res.aiProvider || 'AI ',
         },
       ]);
 
@@ -376,7 +376,7 @@ export default function AiAssistantPanel({
                         }}
                       >
                         <Sparkles size={11} color="#7c3aed" />
-                        {m.provider || 'AI Model (GPT-4o mini)'}
+                        {m.provider || 'AI '}
                       </span>
                       {m.chart && (
                         <button
