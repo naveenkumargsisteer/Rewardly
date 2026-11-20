@@ -111,7 +111,7 @@ export default function AiAssistantPanel({
       sender: 'bot',
       text: "Hi! I'm your Rewardly AI assistant powered by live AI models. Ask me anything about employee scores, sales, attendance, or department performance — click '✨ Add To Dashboard ' on any chart to pin it directly to your Custom Dashboard!",
       suggestedNextSteps: INITIAL_PROMPTS,
-      provider: 'AI Model (Online)',
+      provider: 'AI',
     },
   ]);
   const [input, setInput] = useState('');
